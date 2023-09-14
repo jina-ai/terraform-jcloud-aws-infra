@@ -1,0 +1,21 @@
+existingObjstoreSecret: "jcloud-monitor-store"
+query:
+  replicaLabel:
+    - "prometheus_replica"
+    - "replica"
+  dnsDiscovery:
+    sidecarsService: "kubecost-prom-kube-prometh-thanos-discovery"
+    sidecarsNamespace: "kubecost"
+  replicaCount: 2
+queryFrontend:
+  enabled: false
+compactor:
+  enabled: true
+  retentionResolutionRaw: 3d
+  retentionResolution5m: 10d
+  retentionResolution1h: 1y
+storegateway:
+  enabled: true
+  replicaCount: 1
+metrics:
+  enabled: false

@@ -1,0 +1,887 @@
+# Copyright 2018 The Knative Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: activator
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/component: activator
+    app.kubernetes.io/version: "1.10.0"
+    app.kubernetes.io/name: knative-serving
+spec:
+  selector:
+    matchLabels:
+      app: activator
+      role: activator
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+      labels:
+        app: activator
+        role: activator
+        app.kubernetes.io/component: activator
+        app.kubernetes.io/name: knative-serving
+        app.kubernetes.io/version: "1.10.0"
+    spec:
+      serviceAccountName: controller
+      containers:
+        - name: activator
+          # This is the Go import path for the binary that is containerized
+          # and substituted here.
+          image: gcr.io/knative-releases/knative.dev/serving/cmd/activator@sha256:c129149520cbe84b676d26c08787b471a8c81c5439118f2eb936bdc942836830
+          # The numbers are based on performance test results from
+          # https://github.com/knative/serving/issues/1625#issuecomment-511930023
+          resources:
+            requests:
+              cpu: 300m
+              memory: 60Mi
+            limits:
+              cpu: 1000m
+              memory: 600Mi
+          env:
+            # Run Activator with GC collection when newly generated memory is 500%.
+            - name: GOGC
+              value: "500"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: SYSTEM_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: CONFIG_LOGGING_NAME
+              value: config-logging
+            - name: CONFIG_OBSERVABILITY_NAME
+              value: config-observability
+            # TODO(https://github.com/knative/pkg/pull/953): Remove stackdriver specific config
+            - name: METRICS_DOMAIN
+              value: knative.dev/internal/serving
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - name: metrics
+              containerPort: 9090
+            - name: profiling
+              containerPort: 8008
+            - name: http1
+              containerPort: 8012
+            - name: h2c
+              containerPort: 8013
+          readinessProbe:
+            httpGet:
+              port: 8012
+              httpHeaders:
+                - name: k-kubelet-probe
+                  value: "activator"
+            periodSeconds: 5
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              port: 8012
+              httpHeaders:
+                - name: k-kubelet-probe
+                  value: "activator"
+            periodSeconds: 10
+            failureThreshold: 12
+            initialDelaySeconds: 15
+      # The activator (often) sits on the dataplane, and may proxy long (e.g.
+      # streaming, websockets) requests.  We give a long grace period for the
+      # activator to "lame duck" and drain outstanding requests before we
+      # forcibly terminate the pod (and outstanding connections).  This value
+      # should be at least as large as the upper bound on the Revision's
+      # timeoutSeconds property to avoid servicing events disrupting
+      # connections.
+      terminationGracePeriodSeconds: 600
+      nodeSelector:
+        jina.ai/node-type: "system"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: activator-service
+  namespace: knative-serving
+  labels:
+    app: activator
+    app.kubernetes.io/component: activator
+    app.kubernetes.io/version: "1.10.0"
+    app.kubernetes.io/name: knative-serving
+spec:
+  selector:
+    app: activator
+  ports:
+    # Define metrics and profiling for them to be accessible within service meshes.
+    - name: http-metrics
+      port: 9090
+      targetPort: 9090
+    - name: http-profiling
+      port: 8008
+      targetPort: 8008
+    - name: http
+      port: 80
+      targetPort: 8012
+    - name: http2
+      port: 81
+      targetPort: 8013
+    - name: https
+      port: 443
+      targetPort: 8112
+  type: ClusterIP
+
+---
+# Copyright 2018 The Knative Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autoscaler
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/component: autoscaler
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/version: "1.10.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: autoscaler
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+      labels:
+        app: autoscaler
+        app.kubernetes.io/component: autoscaler
+        app.kubernetes.io/name: knative-serving
+        app.kubernetes.io/version: "1.10.0"
+    spec:
+      # To avoid node becoming SPOF, spread our replicas to different nodes.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: autoscaler
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+      serviceAccountName: controller
+      nodeSelector:
+        jina.ai/node-type: "system"
+      containers:
+        - name: autoscaler
+          # This is the Go import path for the binary that is containerized
+          # and substituted here.
+          image: gcr.io/knative-releases/knative.dev/serving/cmd/autoscaler@sha256:b30009e0d9eb80b2e288145580b2854715b611622907eab14c89d6d4b71a37af
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: 1000m
+              memory: 1000Mi
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: SYSTEM_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: CONFIG_LOGGING_NAME
+              value: config-logging
+            - name: CONFIG_OBSERVABILITY_NAME
+              value: config-observability
+            # TODO(https://github.com/knative/pkg/pull/953): Remove stackdriver specific config
+            - name: METRICS_DOMAIN
+              value: knative.dev/serving
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - name: metrics
+              containerPort: 9090
+            - name: profiling
+              containerPort: 8008
+            - name: websocket
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              port: 8080
+              httpHeaders:
+                - name: k-kubelet-probe
+                  value: "autoscaler"
+          livenessProbe:
+            httpGet:
+              port: 8080
+              httpHeaders:
+                - name: k-kubelet-probe
+                  value: "autoscaler"
+            failureThreshold: 6
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: autoscaler
+    app.kubernetes.io/component: autoscaler
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/version: "1.10.0"
+  name: autoscaler
+  namespace: knative-serving
+spec:
+  ports:
+    # Define metrics and profiling for them to be accessible within service meshes.
+    - name: http-metrics
+      port: 9090
+      targetPort: 9090
+    - name: http-profiling
+      port: 8008
+      targetPort: 8008
+    - name: http
+      port: 8080
+      targetPort: 8080
+  selector:
+    app: autoscaler
+
+---
+# Copyright 2018 The Knative Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/version: "1.10.0"
+spec:
+  selector:
+    matchLabels:
+      app: controller
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+      labels:
+        app: controller
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/name: knative-serving
+        app.kubernetes.io/version: "1.10.0"
+    spec:
+      # To avoid node becoming SPOF, spread our replicas to different nodes.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: controller
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+      serviceAccountName: controller
+      nodeSelector:
+        jina.ai/node-type: "system"
+      containers:
+        - name: controller
+          # This is the Go import path for the binary that is containerized
+          # and substituted here.
+          image: gcr.io/knative-releases/knative.dev/serving/cmd/controller@sha256:0763e6f5fe14db808dad883ef0c7ef8640227e9bedec744be7db514d6cba0da1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: 1000m
+              memory: 1000Mi
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: SYSTEM_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: CONFIG_LOGGING_NAME
+              value: config-logging
+            - name: CONFIG_OBSERVABILITY_NAME
+              value: config-observability
+            # TODO(https://github.com/knative/pkg/pull/953): Remove stackdriver specific config
+            - name: METRICS_DOMAIN
+              value: knative.dev/internal/serving
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: probes
+              scheme: HTTP
+            periodSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /readiness
+              port: probes
+              scheme: HTTP
+            periodSeconds: 5
+            failureThreshold: 3
+          ports:
+            - name: metrics
+              containerPort: 9090
+            - name: profiling
+              containerPort: 8008
+            - name: probes
+              containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: controller
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/version: "1.10.0"
+  name: controller
+  namespace: knative-serving
+spec:
+  ports:
+    # Define metrics and profiling for them to be accessible within service meshes.
+    - name: http-metrics
+      port: 9090
+      targetPort: 9090
+    - name: http-profiling
+      port: 8008
+      targetPort: 8008
+  selector:
+    app: controller
+
+---
+# Copyright 2020 The Knative Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: domain-mapping
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/component: domain-mapping
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/version: "1.10.0"
+spec:
+  selector:
+    matchLabels:
+      app: domain-mapping
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+      labels:
+        app: domain-mapping
+        app.kubernetes.io/component: domain-mapping
+        app.kubernetes.io/name: knative-serving
+        app.kubernetes.io/version: "1.10.0"
+    spec:
+      # To avoid node becoming SPOF, spread our replicas to different nodes.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: domain-mapping
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+      serviceAccountName: controller
+      nodeSelector:
+        jina.ai/node-type: "system"
+      containers:
+        - name: domain-mapping
+          # This is the Go import path for the binary that is containerized
+          # and substituted here.
+          image: gcr.io/knative-releases/knative.dev/serving/cmd/domain-mapping@sha256:0831d24d3b7150893b2fba3899c9d6b6f0bad79123681ad4e3d14c1359bb23e2
+          resources:
+            requests:
+              cpu: 30m
+              memory: 40Mi
+            limits:
+              cpu: 300m
+              memory: 400Mi
+          env:
+            - name: SYSTEM_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: CONFIG_LOGGING_NAME
+              value: config-logging
+            - name: CONFIG_OBSERVABILITY_NAME
+              value: config-observability
+            # TODO(https://github.com/knative/pkg/pull/953): Remove stackdriver specific config
+            - name: METRICS_DOMAIN
+              value: knative.dev/serving
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: probes
+              scheme: HTTP
+            periodSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /readiness
+              port: probes
+              scheme: HTTP
+            periodSeconds: 5
+            failureThreshold: 3
+          ports:
+            - name: metrics
+              containerPort: 9090
+            - name: profiling
+              containerPort: 8008
+            - name: probes
+              containerPort: 8080
+
+---
+# Copyright 2020 The Knative Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: domainmapping-webhook
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/component: domain-mapping
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/version: "1.10.0"
+spec:
+  selector:
+    matchLabels:
+      app: domainmapping-webhook
+      role: domainmapping-webhook
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+      labels:
+        app: domainmapping-webhook
+        role: domainmapping-webhook
+        app.kubernetes.io/component: domain-mapping
+        app.kubernetes.io/name: knative-serving
+        app.kubernetes.io/version: "1.10.0"
+    spec:
+      # To avoid node becoming SPOF, spread our replicas to different nodes.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: domainmapping-webhook
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+      serviceAccountName: controller
+      nodeSelector:
+        jina.ai/node-type: "system"
+      containers:
+        - name: domainmapping-webhook
+          # This is the Go import path for the binary that is containerized
+          # and substituted here.
+          image: gcr.io/knative-releases/knative.dev/serving/cmd/domain-mapping-webhook@sha256:50df310c19bc7c98ea4705a4b909482abafb1a3bb7ec2e26ef61cbd742afa297
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: 500m
+              memory: 500Mi
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: SYSTEM_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: CONFIG_LOGGING_NAME
+              value: config-logging
+            - name: CONFIG_OBSERVABILITY_NAME
+              value: config-observability
+            - name: WEBHOOK_PORT
+              value: "8443"
+            # TODO(https://github.com/knative/pkg/pull/953): Remove stackdriver specific config
+            - name: METRICS_DOMAIN
+              value: knative.dev/serving
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - name: metrics
+              containerPort: 9090
+            - name: profiling
+              containerPort: 8008
+            - name: https-webhook
+              containerPort: 8443
+          readinessProbe:
+            periodSeconds: 1
+            httpGet:
+              scheme: HTTPS
+              port: 8443
+              httpHeaders:
+                - name: k-kubelet-probe
+                  value: "webhook"
+          livenessProbe:
+            periodSeconds: 1
+            httpGet:
+              scheme: HTTPS
+              port: 8443
+              httpHeaders:
+                - name: k-kubelet-probe
+                  value: "webhook"
+            failureThreshold: 6
+            initialDelaySeconds: 20
+      # Our webhook should gracefully terminate by lame ducking first, set this to a sufficiently
+      # high value that we respect whatever value it has configured for the lame duck grace period.
+      terminationGracePeriodSeconds: 300
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    role: domainmapping-webhook
+    app.kubernetes.io/component: domain-mapping
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/version: "1.10.0"
+  name: domainmapping-webhook
+  namespace: knative-serving
+spec:
+  ports:
+    # Define metrics and profiling for them to be accessible within service meshes.
+    - name: http-metrics
+      port: 9090
+      targetPort: 9090
+    - name: http-profiling
+      port: 8008
+      targetPort: 8008
+    - name: https-webhook
+      port: 443
+      targetPort: 8443
+  selector:
+    app: domainmapping-webhook
+    role: domainmapping-webhook
+
+---
+# Copyright 2020 The Knative Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: webhook
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/component: webhook
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/version: "1.10.0"
+spec:
+  minReplicas: 1
+  maxReplicas: 5
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: webhook
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          # Percentage of the requested CPU
+          averageUtilization: 100
+---
+# Webhook PDB.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: webhook-pdb
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/component: webhook
+    app.kubernetes.io/name: knative-serving
+    app.kubernetes.io/version: "1.10.0"
+spec:
+  minAvailable: 80%
+  selector:
+    matchLabels:
+      app: webhook
+
+---
+# Copyright 2018 The Knative Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook
+  namespace: knative-serving
+  labels:
+    app.kubernetes.io/component: webhook
+    app.kubernetes.io/version: "1.10.0"
+    app.kubernetes.io/name: knative-serving
+spec:
+  selector:
+    matchLabels:
+      app: webhook
+      role: webhook
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+      labels:
+        app: webhook
+        role: webhook
+        app.kubernetes.io/component: webhook
+        app.kubernetes.io/version: "1.10.0"
+        app.kubernetes.io/name: knative-serving
+    spec:
+      # To avoid node becoming SPOF, spread our replicas to different nodes.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: webhook
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+      serviceAccountName: controller
+      nodeSelector:
+        jina.ai/node-type: "system"
+      containers:
+        - name: webhook
+          # This is the Go import path for the binary that is containerized
+          # and substituted here.
+          image: gcr.io/knative-releases/knative.dev/serving/cmd/webhook@sha256:a43a7bf3a2d2a62782fe802dcd3ba287fb277a0d8274e5a6aef1bba9d09a0dd6
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            limits:
+              cpu: 500m
+              memory: 500Mi
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: SYSTEM_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: CONFIG_LOGGING_NAME
+              value: config-logging
+            - name: CONFIG_OBSERVABILITY_NAME
+              value: config-observability
+            - name: WEBHOOK_NAME
+              value: webhook
+            - name: WEBHOOK_PORT
+              value: "8443"
+            # TODO(https://github.com/knative/pkg/pull/953): Remove stackdriver specific config
+            - name: METRICS_DOMAIN
+              value: knative.dev/internal/serving
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - name: metrics
+              containerPort: 9090
+            - name: profiling
+              containerPort: 8008
+            - name: https-webhook
+              containerPort: 8443
+          readinessProbe:
+            periodSeconds: 1
+            httpGet:
+              scheme: HTTPS
+              port: 8443
+              httpHeaders:
+                - name: k-kubelet-probe
+                  value: "webhook"
+          livenessProbe:
+            periodSeconds: 1
+            httpGet:
+              scheme: HTTPS
+              port: 8443
+              httpHeaders:
+                - name: k-kubelet-probe
+                  value: "webhook"
+            failureThreshold: 6
+            initialDelaySeconds: 20
+      # Our webhook should gracefully terminate by lame ducking first, set this to a sufficiently
+      # high value that we respect whatever value it has configured for the lame duck grace period.
+      terminationGracePeriodSeconds: 300
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    role: webhook
+    app.kubernetes.io/component: webhook
+    app.kubernetes.io/version: "1.10.0"
+    app.kubernetes.io/name: knative-serving
+  name: webhook
+  namespace: knative-serving
+spec:
+  ports:
+    # Define metrics and profiling for them to be accessible within service meshes.
+    - name: http-metrics
+      port: 9090
+      targetPort: 9090
+    - name: http-profiling
+      port: 8008
+      targetPort: 8008
+    - name: https-webhook
+      port: 443
+      targetPort: 8443
+  selector:
+    app: webhook
+    role: webhook

@@ -1,0 +1,42 @@
+alertmanager:
+  enabled: false
+grafana:
+  enabled: false
+prometheusOperator:
+  hostNetwork: false
+  kubeletService:
+    enabled: false
+nodeExporter:
+  enabled: false
+kubeStateMetrics:
+  enabled: false
+prometheus:
+  hostNetwork: false
+  thanosService:
+    enabled: true
+  prometheusSpec:
+    retention: 1h
+    retentionSize: "20GB"
+    disableCompaction: true
+    externalLabels:
+      cluster: ${cluster_name}
+      cluster_id: ${cluster_name}
+    replicas: 2
+    ## Hardcoded thanos value block so as to pass thanos configure to prometheus stack chart.
+    ## This should be fixed once we have customized prometheus resource.
+    thanos:
+      objectStorageConfig:
+        name: jcloud-monitor-store
+        key: objstore.yml
+    additionalScrapeConfigs:
+      - job_name: kubecost
+        honor_labels: true
+        scrape_interval: 1m
+        scrape_timeout: 10s
+        metrics_path: /metrics
+        scheme: http
+        dns_sd_configs:
+          - names:
+              - kubecost-cost-analyzer.kubecost
+            type: "A"
+            port: 9003
