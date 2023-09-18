@@ -1,0 +1,70 @@
+minio:
+  enabled: false
+global_overrides:
+  metrics_generator_processors:
+    - service-graphs
+    - span-metrics
+server:
+  # -- Log level. Can be set to trace, debug, info (default), warn, error, fatal, panic
+  logLevel: info
+search:
+  # -- Enable Tempo search
+  enabled: true
+metricsGenerator:
+  # -- Specifies whether a metrics-generator should be deployed
+  enabled: true
+  config:
+    registry:
+      collection_interval: 3s
+      external_labels: {}
+      stale_duration: 15m
+    storage:
+      remote_write_flush_deadline: 1m
+      # -- A list of remote write endpoints.
+      # -- https://prometheus.io/docs/prometheus/latest/configuration/configuration/#remote_write
+      remote_write: 
+      - name: prometheus
+        tls_config:
+          insecure_skip_verify: true
+        url: http://kube-prometheus-stack-prometheus:9090/api/v1/write
+traces:
+  otlp:
+    http:
+      # -- Enable Tempo to ingest Open Telemetry HTTP traces
+      enabled: true
+    grpc:
+      # -- Enable Tempo to ingest Open Telemetry GRPC traces
+      enabled: true
+queryFrontend:
+  podSecurityContext: {}
+  query:
+    # -- Required for grafana version <7.5 for compatibility with jaeger-ui. Doesn't work on ARM arch
+    enabled: true
+  config:
+    search:
+      # -- The number of concurrent jobs to execute when searching the backend
+      concurrent_jobs: 1000
+      max_duration: 480h
+storage:
+  trace:
+    # -- The supported storage backends are gcs, s3 and azure, as specified in https://grafana.com/docs/tempo/latest/configuration/#storage
+    backend: s3
+    s3: 
+      bucket: "$MONITOR_TRACES_BUCKET"
+      endpoint: "s3.$MONITOR_REGION.amazonaws.com"
+      access_key: "$MONITOR_USER_ACCESS_KEY"
+      secret_key: "$MONITOR_USER_SECRET_KEY"
+      insecure: true
+  
+# tempo-query fails because default security context does not work
+tempo:
+  securityContext:
+    capabilities:
+      drop: []
+    runAsNonRoot: false
+    readOnlyRootFilesystem: false
+  podSecurityContext:
+    capabilities:
+      drop: []
+    runAsNonRoot: false
+    readOnlyRootFilesystem: false
