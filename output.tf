@@ -264,3 +264,27 @@ output "mount_target_dns_name" {
   description = "The DNS name for the given subnet/AZ"
   value       = try(module.eks-efs-csi[0].mount_target_dns_name, "")
 }
+
+################################################################################
+# Monitor
+################################################################################
+
+output "prometheus_stack_yaml_body" {
+  description = "YAML of prometheus stack"
+  value       = try(module.monitor[0].prometheus_stack_yaml_body, "")
+}
+
+output "loki_yaml_body" {
+  description = "YAML of Loki"
+  value       = try(module.monitor[0].loki_yaml_body, "")
+}
+
+output "tempo_yaml_body" {
+  description = "YAML of Tempo"
+  value       = try(module.monitor[0].tempo_yaml_body, "")
+}
+
+output "promtail_yaml_body" {
+  description = "YAML of Tempo"
+  value       = try(module.monitor[0].promtail_yaml_body, "")
+}
