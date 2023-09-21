@@ -72,37 +72,37 @@ module "vpc_endpoints" {
 
   endpoints = {
     ssm = {
-      service             = "ssm"
+      service_name        = "com.amazonaws.${local.region}.ssm"
       private_dns_enabled = true
       subnet_ids          = module.vpc.private_subnets
     },
     ssmmessages = {
-      service             = "ssmmessages"
+      service_name        = "com.amazonaws.${local.region}.ssmmessages"
       private_dns_enabled = true
       subnet_ids          = module.vpc.private_subnets
     },
     ec2 = {
-      service             = "ec2"
+      service_name        = startswith(local.region, "cn") ? "cn.com.amazonaws.${local.region}.ec2" : "com.amazonaws.${local.region}.ec2"
       private_dns_enabled = true
       subnet_ids          = module.vpc.private_subnets
     },
     ec2messages = {
-      service             = "ec2messages"
+      service_name        = "com.amazonaws.${local.region}.ec2messages"
       private_dns_enabled = true
       subnet_ids          = module.vpc.private_subnets
     },
     ecr_api = {
-      service             = "ecr.api"
+      service_name        = startswith(local.region, "cn") ? "cn.com.amazonaws.${local.region}.ecr.api" : "com.amazonaws.${local.region}.ecr.api"
       private_dns_enabled = true
       subnet_ids          = module.vpc.private_subnets
     },
     ecr_dkr = {
-      service             = "ecr.dkr"
+      service_name        = startswith(local.region, "cn") ? "cn.com.amazonaws.${local.region}.ecr.dkr" : "com.amazonaws.${local.region}.ecr.dkr"
       private_dns_enabled = true
       subnet_ids          = module.vpc.private_subnets
     },
     s3 = {
-      service         = "s3"
+      service_name    = "com.amazonaws.${local.region}.s3"
       service_type    = "Gateway"
       route_table_ids = module.vpc.private_route_table_ids
     }
