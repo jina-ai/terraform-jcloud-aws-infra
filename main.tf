@@ -51,7 +51,43 @@ locals {
   account_id   = data.aws_caller_identity.current.account_id
   vpc_name     = var.vpc_name
   vpc_regions  = "[${join(", ", var.azs)}]"
-  region       = try(var.region, data.aws_region.current.name)
+  init_nodegroup = {
+    inital = {
+      instance_types = var.init_node_type
+      # We don't need the node security group since we are using the
+      # cluster-created security group, which Karpenter will also use
+      create_security_group                 = false
+      attach_cluster_primary_security_group = false
+
+      min_size     = 1
+      max_size     = 3
+      desired_size = 2
+
+
+      iam_role_additional_policies = {
+        # Required by Karpenter
+        KarpenterAmazonSSMManagedInstanceCore = "arn:${local.partition}:iam::aws:policy/AmazonSSMManagedInstanceCore",
+        KarpenterCloudWatchAgentServerPolicy  = "arn:${local.partition}:iam::aws:policy/CloudWatchAgentServerPolicy"
+      }
+
+      bootstrap_extra_args = "--max-pods=110 --system-reserved cpu=300m,memory=0.5Gi,ephemeral-storage=1Gi --eviction-hard memory.available<200Mi,nodefs.available<10% --image-gc-high-threshold=80 --image-gc-low-threshold=60"
+
+      pre_bootstrap_user_data = <<-EOT
+      #!/bin/bash
+      set -ex
+      cat <<-EOF > /etc/profile.d/bootstrap.sh
+      export CONTAINER_RUNTIME="containerd"
+      EOF
+      # Source extra environment variables in bootstrap script
+      sed -i '/^set -o errexit/a\\nsource /etc/profile.d/bootstrap.sh' /etc/eks/bootstrap.sh
+      EOT
+
+      force_update_version = true
+      labels = {
+        "jina.ai/node-type" = "system"
+      }
+    }
+  }
 }
 
 
@@ -74,8 +110,8 @@ module "eks" {
   # Required for Karpenter role below
   enable_irsa = true
 
-  create_cluster_security_group = true
-  create_node_security_group    = true
+  create_cluster_security_group = var.create_cluster_security_group
+  create_node_security_group    = var.create_node_security_group
 
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
@@ -161,41 +197,9 @@ module "eks" {
   # Only need one node to get Karpenter up and running.
   # This ensures core services such as VPC CNI, CoreDNS, etc. are up and running
   # so that Karpetner can be deployed and start managing compute capacity as required
-  eks_managed_node_groups = {
-    inital = {
-      instance_types = var.init_node_type
-      # We don't need the node security group since we are using the
-      # cluster-created security group, which Karpenter will also use
-      create_security_group                 = false
-      attach_cluster_primary_security_group = false
+  eks_managed_node_groups = local.init_nodegroup
 
-      min_size     = 1
-      max_size     = 3
-      desired_size = 2
-
-
-      iam_role_additional_policies = {
-        # Required by Karpenter
-        KarpenterAmazonSSMManagedInstanceCore = "arn:${local.partition}:iam::aws:policy/AmazonSSMManagedInstanceCore",
-        KarpenterCloudWatchAgentServerPolicy  = "arn:${local.partition}:iam::aws:policy/CloudWatchAgentServerPolicy"
-      }
-
-      pre_bootstrap_user_data = <<-EOT
-      #!/bin/bash
-      set -ex
-      cat <<-EOF > /etc/profile.d/bootstrap.sh
-      export CONTAINER_RUNTIME="containerd"
-      EOF
-      # Source extra environment variables in bootstrap script
-      sed -i '/^set -o errexit/a\\nsource /etc/profile.d/bootstrap.sh' /etc/eks/bootstrap.sh
-      EOT
-
-      force_update_version = true
-      labels = {
-        "jina.ai/node-type" = "system"
-      }
-    }
-  }
+  cluster_service_ipv4_cidr = var.cluster_service_ipv4_cidr
 
   # aws-auth configmap
   manage_aws_auth_configmap = true
@@ -290,8 +294,10 @@ resource "time_sleep" "this" {
   create_duration = "60s"
 
   triggers = {
-    cluster_name     = module.eks.cluster_name
-    cluster_endpoint = module.eks.cluster_endpoint
+    cluster_name                       = module.eks.cluster_name
+    cluster_endpoint                   = module.eks.cluster_endpoint
+    cluster_version                    = module.eks.cluster_version
+    cluster_certificate_authority_data = module.eks.cluster_certificate_authority_data
   }
   depends_on = [module.eks.eks_managed_node_groups]
 }
@@ -326,6 +332,15 @@ module "eks-efs-csi" {
   endpoint                   = module.eks.cluster_endpoint
   binding_mode               = var.efs_binding_mode != "" ? var.efs_binding_mode : "Immediate"
   certificate_authority_data = module.eks.cluster_certificate_authority_data
+}
+
+module "autoscaler" {
+  count             = var.enable_cluster_autoscaler ? 1 : 0
+  source            = "./modules/aws/cluster-autoscaler"
+  cluster_region    = var.region
+  cluster_name      = time_sleep.this.triggers["cluster_name"]
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  namespace         = "wolf"
 }
 
 module "alb-controller" {

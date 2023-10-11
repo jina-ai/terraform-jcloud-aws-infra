@@ -12,7 +12,7 @@ data "aws_eks_cluster_auth" "cluster" {
 }
 
 locals {
-  cluster_name = var.cluster_name
+  cluster_name = "mycluster"
   partition    = data.aws_partition.current.partition
   vpc_name     = "small-vpc-for-dev"
 }
@@ -25,14 +25,14 @@ module "jcloud" {
   # https://registry.terraform.io/modules/terraform-aws-modules/eks/aws/latest
   source = "../../"
 
-  region       = var.region
+  region       = "us-east-1"
   cluster_name = local.cluster_name
 
   vpc_name    = local.vpc_name
   eks_version = "1.27"
 
   cidr            = "10.200.0.0/20"
-  azs             = ["${var.region}a", "${var.region}b", "${var.region}c"]
+  azs             = ["us-east-1a", "us-east-1b", "us-east-1c"]
   public_subnets  = ["10.200.6.0/24", "10.200.7.0/24", "10.200.8.0/24"]
   private_subnets = ["10.200.0.0/23", "10.200.2.0/23", "10.200.4.0/23"]
 
@@ -46,5 +46,7 @@ module "jcloud" {
   enable_karpenter    = false
   enable_ebs          = false
 
-  tags = var.tags
+  tags = {
+    Terraform = "true"
+  }
 }
