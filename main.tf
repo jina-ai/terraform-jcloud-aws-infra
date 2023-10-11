@@ -38,6 +38,7 @@ data "aws_ami" "eks_node_gpu" {
 
 data "aws_partition" "current" {}
 data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
 
 ################################################################################
 # Local Variables
@@ -183,6 +184,8 @@ module "eks" {
     }
   }
 
+  cluster_iam_role_dns_suffix = "amazonaws.com"
+
   create_kms_key = var.create_kms_key
   cluster_encryption_config = {
     resources = ["secrets"]
@@ -324,7 +327,7 @@ module "eks-efs-csi" {
   subnets                    = module.vpc.private_subnets
   allow_cidr                 = var.cidr
   oidc_provider_arn          = module.eks.oidc_provider_arn
-  region                     = var.region
+  region                     = local.region
   create_efs                 = true
   endpoint                   = module.eks.cluster_endpoint
   binding_mode               = var.efs_binding_mode != "" ? var.efs_binding_mode : "Immediate"

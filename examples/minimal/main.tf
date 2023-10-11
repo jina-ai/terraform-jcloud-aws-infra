@@ -43,6 +43,8 @@ module "jcloud" {
   enable_cert_manager = false
   enable_kong         = true
   enable_linkerd      = true
+  enable_karpenter    = false
+  enable_ebs          = false
 
   tags = {
     Terraform = "true"

@@ -14,16 +14,21 @@ data "kubectl_file_documents" "serving-hpa" {
   content = file("${path.module}/serving-hpa.yaml")
 }
 
+data "kubectl_file_documents" "serving-webhooks" {
+  content = file("${path.module}/serving-webhooks.yaml")
+}
+
 data "kubectl_file_documents" "kourier" {
   content = file("${path.module}/kourier.yaml")
 }
 
 locals {
-  crds_length    = try(length(data.kubectl_file_documents.serving-crds.documents), 0)
-  core_length    = try(length(data.kubectl_file_documents.serving-core.documents), 0)
-  deploy_length  = try(length(data.kubectl_file_documents.serving-deploys.documents), 0)
-  hpa_length     = try(length(data.kubectl_file_documents.serving-hpa.documents), 0)
-  kourier_length = try(length(data.kubectl_file_documents.kourier.documents), 0)
+  crds_length     = try(length(data.kubectl_file_documents.serving-crds.documents), 0)
+  core_length     = try(length(data.kubectl_file_documents.serving-core.documents), 0)
+  deploy_length   = try(length(data.kubectl_file_documents.serving-deploys.documents), 0)
+  hpa_length      = try(length(data.kubectl_file_documents.serving-hpa.documents), 0)
+  webhooks_length = try(length(data.kubectl_file_documents.serving-webhooks.documents), 0)
+  kourier_length  = try(length(data.kubectl_file_documents.kourier.documents), 0)
 }
 
 resource "kubernetes_namespace" "knative-serving" {
@@ -89,6 +94,13 @@ resource "kubectl_manifest" "serving-hpa-resources" {
   yaml_body  = element(data.kubectl_file_documents.serving-hpa.documents, count.index)
   force_new  = true
   depends_on = [kubectl_manifest.serving-core-resources]
+}
+
+resource "kubectl_manifest" "serving-webhooks-resources" {
+  count      = local.webhooks_length
+  yaml_body  = element(data.kubectl_file_documents.serving-webhooks.documents, count.index)
+  force_new  = true
+  depends_on = [kubectl_manifest.serving-deploy-resources]
 }
 
 resource "kubernetes_config_map_v1_data" "config-domain" {

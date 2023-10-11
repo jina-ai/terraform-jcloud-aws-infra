@@ -161,7 +161,7 @@ output "cloudwatch_log_group_arn" {
 # TODO: Might be just the efs csi
 output "region" {
   description = "Region of the AWS resources"
-  value       = var.region
+  value       = local.region
 }
 
 output "aws_auth_configmap_yaml" {
