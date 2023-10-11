@@ -69,42 +69,6 @@ variable "eks_version" {
   default     = ""
 }
 
-variable "node_groups" {
-  description = "Map of EKS managed node group definitions to create"
-  type        = any
-  default     = {}
-}
-
-variable "eks_managed_node_group_defaults" {
-  description = "Map of EKS managed node group default configurations"
-  type        = any
-  default     = {}
-}
-
-variable "create_cluster_security_group" {
-  description = "Determines if a security group is created for the cluster. Note: the EKS service creates a primary security group for the cluster by default"
-  type        = bool
-  default     = true
-}
-
-variable "create_node_security_group" {
-  description = "Determines whether to create a security group for the node groups or use the existing `node_security_group_id`"
-  type        = bool
-  default     = true
-}
-
-variable "node_security_group_id" {
-  description = "ID of an existing security group to attach to the node groups created"
-  type        = string
-  default     = ""
-}
-
-variable "cluster_service_ipv4_cidr" {
-  description = "The CIDR block to assign Kubernetes service IP addresses from. If you don't specify a block, Kubernetes assigns addresses from either the 10.100.0.0/16 or 172.20.0.0/16 CIDR blocks"
-  type        = string
-  default     = null
-}
-
 ################################################################################
 # KMS Key
 ################################################################################
@@ -133,8 +97,6 @@ variable "kms_key_users" {
   type        = list(string)
   default     = []
 }
-
-# Flags for components
 
 variable "enable_alb_controller" {
   description = "Whether enable ALB controller in EKS"
@@ -172,10 +134,16 @@ variable "enable_monitor_store" {
   default     = false
 }
 
-variable "enable_cluster_autoscaler" {
-  description = "Whether enable cluster autoscaler"
-  type        = bool
-  default     = false
+variable "shared_gpu_instance_type" {
+  description = "A list of EC2 instance type for shared GPU usage"
+  type        = list(string)
+  default     = ["g5.xlarge", "g5.2xlarge", "g5.4xlarge"]
+}
+
+variable "gpu_instance_type" {
+  description = "A list of EC2 instance type for dedicated GPU usage"
+  type        = list(string)
+  default     = ["g5.xlarge", "g5.2xlarge", "g5.4xlarge", "g5.12xlarge"]
 }
 
 variable "enable_external_dns" {
@@ -188,18 +156,6 @@ variable "enable_karpenter" {
   description = "Whether to enable karpenter"
   type        = bool
   default     = false
-}
-
-variable "shared_gpu_instance_type" {
-  description = "A list of EC2 instance type for shared GPU usage"
-  type        = list(string)
-  default     = ["g5.xlarge", "g5.2xlarge", "g5.4xlarge"]
-}
-
-variable "gpu_instance_type" {
-  description = "A list of EC2 instance type for dedicated GPU usage"
-  type        = list(string)
-  default     = ["g5.xlarge", "g5.2xlarge", "g5.4xlarge", "g5.12xlarge"]
 }
 
 variable "enable_ebs" {
@@ -225,8 +181,6 @@ variable "efs_binding_mode" {
   type        = string
   default     = "Immediate"
 }
-
-# EKS RBAC
 
 variable "eks_admin_users" {
   description = "eks admin user"
