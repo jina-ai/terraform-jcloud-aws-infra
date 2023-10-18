@@ -43,6 +43,9 @@ module "jcloud" {
   shared_gpu_instance_type = ["g4dn.xlarge", "g4dn.2xlarge", "g4dn.4xlarge"]
   gpu_instance_type        = ["g4dn.xlarge", "g4dn.2xlarge", "g4dn.4xlarge", "g4dn.12xlarge"]
 
+  shared_gpu_node_labels = { "k8s.amazonaws.com/accelerator" = "nvidia-tesla-t4" }
+  gpu_node_labels        = { "k8s.amazonaws.com/accelerator" = "nvidia-tesla-t4" }
+
   enable_cert_manager = false
   enable_kong         = true
   enable_linkerd      = true
@@ -51,6 +54,7 @@ module "jcloud" {
   enable_gpu          = true
 
   tags = {
-    Terraform = "true"
+    Terraform                = "true"
+    "karpenter.sh/discovery" = "${local.cluster_name}"
   }
 }

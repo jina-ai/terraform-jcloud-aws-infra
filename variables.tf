@@ -331,6 +331,18 @@ variable "remote_external_dns_role" {
   default     = ""
 }
 
+variable "shared_gpu_node_labels" {
+  description = "Karpenter accelerator type for shared GPU"
+  type        = map(any)
+  default     = {}
+}
+
+variable "gpu_node_labels" {
+  description = "Karpenter accelerator type for GPU"
+  type        = map(any)
+  default     = {}
+}
+
 # Cert manager
 
 variable "certs" {
