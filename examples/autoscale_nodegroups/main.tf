@@ -15,6 +15,13 @@ locals {
   cluster_name = "mycluster"
   partition    = data.aws_partition.current.partition
   vpc_name     = "medium-vpc-for-dev"
+  gpu_types = {
+    "P2" : "nvidia-tesla-k80",
+    "P3" : "nvidia-tesla-v100",
+    "G4" : "nvidia-tesla-t4",
+    "P4" : "nvidia-tesla-a100",
+    "G5" : "nvidia-a10g"
+  }
 }
 
 ################################################################################
@@ -38,6 +45,8 @@ module "jcloud" {
 
   shared_gpu_instance_type = ["g4dn.xlarge"]
 
+  aws_auth_node_iam_role_arns_non_windows = ["autoscale-eks-node-group"] // Add node group arn to cluster
+
   kms_key_owners = [data.aws_caller_identity.current.arn]
 
   eks_admin_users = [data.aws_caller_identity.current.arn, "NikosPitsillos"]
@@ -46,7 +55,6 @@ module "jcloud" {
   enable_kong               = true
   enable_linkerd            = true
   enable_cluster_autoscaler = true
-  enable_ebs                = true
   enable_karpenter          = false
   enable_gpu                = true
 
@@ -67,6 +75,8 @@ module "eks_managed_node_group" {
   use_name_prefix = false
   platform        = "linux"
 
+  iam_role_use_name_prefix = false
+
   create = true
 
   cluster_name        = local.cluster_name
@@ -76,9 +86,9 @@ module "eks_managed_node_group" {
 
   instance_types = ["g4dn.xlarge"]
 
-  min_size     = 1
+  min_size     = 0
   max_size     = 10
-  desired_size = 2
+  desired_size = 1
 
   subnet_ids                        = module.jcloud.private_subnets
   vpc_security_group_ids            = [module.jcloud.node_security_group_id]
@@ -119,8 +129,16 @@ module "eks_managed_node_group" {
     "jina.ai/gpu-type"  = "nvidia"
   }, var.tags)
 
+  taints = {
+    gpu = {
+      key    = "nvidia.com/gpu"
+      effect = "NO_SCHEDULE"
+    }
+  }
+
   labels = {
-    "jina.ai/node-type" = "asg"
-    "jina.ai/gpu-type"  = "nvidia"
+    "jina.ai/node-type"             = "asg"
+    "jina.ai/gpu-type"              = "nvidia"
+    "k8s.amazonaws.com/accelerator" = local.gpu_types.G4
   }
 }

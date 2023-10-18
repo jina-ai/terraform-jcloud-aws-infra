@@ -40,11 +40,13 @@ module "iam_policy" {
 
 module "cluster-autoscaler-irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 4.21.1"
+  version = "~> 5.30.0"
 
-  role_name = "cluster_autoscaler_${var.cluster_name}"
+  role_name = "${var.cluster_name}-cluster-autoscaler-role"
 
-  attach_cluster_autoscaler_policy = true
+  role_policy_arns = {
+    autoscaler = module.iam_policy.arn
+  }
 
   oidc_providers = {
     cluster-autoscaler = {

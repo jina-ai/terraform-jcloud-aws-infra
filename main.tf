@@ -51,6 +51,7 @@ locals {
   account_id   = data.aws_caller_identity.current.account_id
   vpc_name     = var.vpc_name
   vpc_regions  = "[${join(", ", var.azs)}]"
+  region       = try(var.region, data.aws_region.current.name)
   init_nodegroup = {
     inital = {
       instance_types = var.init_node_type
