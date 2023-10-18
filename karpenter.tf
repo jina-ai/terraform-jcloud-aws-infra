@@ -1,3 +1,10 @@
+locals {
+  accelerator_labels = {
+    "shared_gpu" = var.shared_gpu_node_labels,
+    "gpu"        = var.gpu_node_labels
+  }
+}
+
 resource "aws_iam_instance_profile" "karpenter" {
   count = var.enable_karpenter ? 1 : 0
   name  = "KarpenterNodeInstanceProfile-${local.cluster_name}"
@@ -248,6 +255,21 @@ resource "kubectl_manifest" "karpenter_provisioner_gpu_shared" {
       jina.ai/node-type: gpu-shared
       jina.ai/gpu-type: nvidia
       nvidia.com/device-plugin.config: shared_gpu
+      ${yamlencode(local.accelerator_labels.shared_gpu)}
+    affinity:
+      podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  run: overprovisioning
+              topologyKey: kubernetes.io/hostname
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            run: overprovisioning
     requirements:
       - key: node.kubernetes.io/instance-type
         operator: In
@@ -290,6 +312,7 @@ resource "kubectl_manifest" "karpenter_provisioner_gpu" {
     labels:
       jina.ai/node-type: gpu
       jina.ai/gpu-type: nvidia
+      ${yamlencode(local.accelerator_labels.gpu)}
     requirements:
       - key: node.kubernetes.io/instance-type
         operator: In
