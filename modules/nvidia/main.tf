@@ -1,5 +1,9 @@
 data "aws_region" "current" {}
 
+locals {
+  slicing_replicas = var.slicing_replicas != 0 ? var.slicing_replicas : 3
+}
+
 resource "helm_release" "nvidia_plugin" {
   namespace        = var.namespace
   create_namespace = true
@@ -61,7 +65,7 @@ resource "kubectl_manifest" "nvidia_plugin_cm" {
                   renameByDefault: false
                   resources:
                   - name: nvidia.com/gpu
-                    replicas: 4
+                    replicas: ${local.slicing_replicas}
   YAML
 
   depends_on = [
