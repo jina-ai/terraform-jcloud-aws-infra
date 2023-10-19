@@ -10,3 +10,8 @@ variable "namespace" {
   default     = "nvidia-device-plugin"
 }
 
+variable "slicing_replicas" {
+  description = "Shared GPU slice number"
+  type        = number
+  default     = 3
+}

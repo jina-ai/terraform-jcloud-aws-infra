@@ -383,7 +383,8 @@ module "nvidia_plugin" {
   node_selector = {
     "jina.ai/gpu-type" = "nvidia"
   }
-  depends_on = [module.eks]
+  slicing_replicas = var.shared_gpu_slicing_replicas
+  depends_on       = [module.eks]
 }
 
 module "cert_manager" {

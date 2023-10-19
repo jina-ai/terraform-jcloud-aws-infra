@@ -331,6 +331,12 @@ variable "remote_external_dns_role" {
   default     = ""
 }
 
+variable "shared_gpu_slicing_replicas" {
+  description = "Shared GPU slice number"
+  type        = number
+  default     = 3
+}
+
 variable "shared_gpu_node_labels" {
   description = "Karpenter accelerator type for shared GPU"
   type        = map(any)
