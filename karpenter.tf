@@ -96,9 +96,6 @@ resource "kubectl_manifest" "karpenter_provisioner" {
       - key: karpenter.k8s.aws/instance-size
         operator: NotIn
         values:
-        - nano
-        - micro
-        - small
         - 8xlarge
         - 12xlarge
         - 16xlarge
@@ -152,9 +149,6 @@ resource "kubectl_manifest" "karpenter_provisioner_system" {
       - key: karpenter.k8s.aws/instance-size
         operator: NotIn
         values:
-        - nano
-        - micro
-        - small
         - 8xlarge
         - 12xlarge
         - 16xlarge
@@ -208,9 +202,6 @@ resource "kubectl_manifest" "karpenter_provisioner_privileged" {
       - key: karpenter.k8s.aws/instance-size
         operator: NotIn
         values:
-        - nano
-        - micro
-        - small
         - 8xlarge
         - 12xlarge
         - 16xlarge
