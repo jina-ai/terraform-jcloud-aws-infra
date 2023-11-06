@@ -29,7 +29,7 @@ module "jcloud" {
   cluster_name = local.cluster_name
 
   vpc_name    = local.vpc_name
-  eks_version = "1.27"
+  eks_version = "1.28"
 
   cidr            = "10.200.0.0/20"
   azs             = ["us-east-1a", "us-east-1b", "us-east-1c"]
@@ -42,6 +42,9 @@ module "jcloud" {
 
   shared_gpu_instance_type = ["g4dn.xlarge", "g4dn.2xlarge", "g4dn.4xlarge"]
   gpu_instance_type        = ["g4dn.xlarge", "g4dn.2xlarge", "g4dn.4xlarge", "g4dn.12xlarge"]
+  standard_instance_type   = ["t3a.medium", "t3a.small"]
+  system_instance_type     = ["t3a.medium"]
+
 
   shared_gpu_node_labels = { "k8s.amazonaws.com/accelerator" = "nvidia-tesla-t4" }
   gpu_node_labels        = { "k8s.amazonaws.com/accelerator" = "nvidia-tesla-t4" }

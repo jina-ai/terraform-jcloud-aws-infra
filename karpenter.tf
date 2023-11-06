@@ -3,6 +3,10 @@ locals {
     "shared_gpu" = var.shared_gpu_node_labels,
     "gpu"        = var.gpu_node_labels
   }
+  shared_gpu_instance_type = "[\"${join("\", \"", var.shared_gpu_instance_type)}\"]"
+  gpu_instance_type        = "[\"${join("\", \"", var.gpu_instance_type)}\"]"
+  standard_instance_type   = "[\"${join("\", \"", var.standard_instance_type)}\"]"
+  system_instance_type     = "[\"${join("\", \"", var.system_instance_type)}\"]"
 }
 
 resource "aws_iam_instance_profile" "karpenter" {
@@ -86,25 +90,9 @@ resource "kubectl_manifest" "karpenter_provisioner" {
     labels:
       jina.ai/node-type: standard
     requirements:
-      - key: karpenter.k8s.aws/instance-family
+      - key: node.kubernetes.io/instance-type
         operator: In
-        values: 
-        - t3
-        - c5
-        - m5
-        - r5
-      - key: karpenter.k8s.aws/instance-size
-        operator: NotIn
-        values:
-        - nano
-        - micro
-        - small
-        - 8xlarge
-        - 12xlarge
-        - 16xlarge
-        - 24xlarge
-        - 32xlarge
-        - metal
+        values: ${local.standard_instance_type}
       - key: "topology.kubernetes.io/zone"
         operator: In
         values: ${local.vpc_regions}
@@ -142,25 +130,9 @@ resource "kubectl_manifest" "karpenter_provisioner_system" {
     labels:
       jina.ai/node-type: system
     requirements:
-      - key: karpenter.k8s.aws/instance-family
+      - key: node.kubernetes.io/instance-type
         operator: In
-        values:
-        - t3
-        - c5
-        - m5
-        - r5
-      - key: karpenter.k8s.aws/instance-size
-        operator: NotIn
-        values:
-        - nano
-        - micro
-        - small
-        - 8xlarge
-        - 12xlarge
-        - 16xlarge
-        - 24xlarge
-        - 32xlarge
-        - metal
+        values: ${local.system_instance_type}
       - key: "topology.kubernetes.io/zone"
         operator: In
         values: ${local.vpc_regions}
@@ -208,9 +180,6 @@ resource "kubectl_manifest" "karpenter_provisioner_privileged" {
       - key: karpenter.k8s.aws/instance-size
         operator: NotIn
         values:
-        - nano
-        - micro
-        - small
         - 8xlarge
         - 12xlarge
         - 16xlarge
@@ -273,7 +242,7 @@ resource "kubectl_manifest" "karpenter_provisioner_gpu_shared" {
     requirements:
       - key: node.kubernetes.io/instance-type
         operator: In
-        values: ["${join("\", \"", var.shared_gpu_instance_type)}"]
+        values: ${local.shared_gpu_instance_type}
       - key: karpenter.sh/capacity-type
         operator: In
         values: ["spot", "on-demand"]
@@ -316,7 +285,7 @@ resource "kubectl_manifest" "karpenter_provisioner_gpu" {
     requirements:
       - key: node.kubernetes.io/instance-type
         operator: In
-        values: ["${join("\", \"", var.gpu_instance_type)}"]
+        values: ${local.gpu_instance_type}
       - key: karpenter.sh/capacity-type
         operator: In
         values: ["spot", "on-demand"]

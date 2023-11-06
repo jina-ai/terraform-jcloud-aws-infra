@@ -207,6 +207,18 @@ variable "enable_karpenter" {
   default     = false
 }
 
+variable "standard_instance_type" {
+  description = "A list of EC2 instance type for stardard usage"
+  type        = list(string)
+  default     = ["t3.medium", "t3.large", "t3.xlarge"]
+}
+
+variable "system_instance_type" {
+  description = "A list of EC2 instance type for system usage"
+  type        = list(string)
+  default     = ["t3.medium", "t3.large", "t3.xlarge"]
+}
+
 variable "shared_gpu_instance_type" {
   description = "A list of EC2 instance type for shared GPU usage"
   type        = list(string)
