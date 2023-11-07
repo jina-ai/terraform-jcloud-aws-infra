@@ -343,6 +343,12 @@ variable "remote_external_dns_role" {
   default     = ""
 }
 
+variable "external_dns_role" {
+  description = "External AWS external DNS role"
+  type        = string
+  default     = ""
+}
+
 variable "shared_gpu_slicing_replicas" {
   description = "Shared GPU slice number"
   type        = number
