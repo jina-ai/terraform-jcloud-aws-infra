@@ -35,3 +35,9 @@ variable "external_dns_role" {
   type        = string
   default     = ""
 }
+
+variable "trigger_by_events" {
+  description = "External DNS update by events"
+  type        = bool
+  default     = true
+}
