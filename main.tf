@@ -99,7 +99,7 @@ locals {
 module "eks" {
   # https://registry.terraform.io/modules/terraform-aws-modules/eks/aws/latest
   source  = "terraform-aws-modules/eks/aws"
-  version = "19.16.0"
+  version = "19.19.0"
 
   cluster_name                    = local.cluster_name
   cluster_version                 = var.eks_version

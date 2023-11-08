@@ -13,6 +13,12 @@ locals {
   metrics_bucket = length(var.kubecost_metric_buckets) > 0 ? var.kubecost_metric_buckets : "${var.cluster_name}-kubecost-metrics"
 }
 
+resource "kubernetes_namespace" "kubecost" {
+  metadata {
+    name = "kubecost"
+  }
+}
+
 resource "kubernetes_secret" "kubecost_metrics_secret" {
 
   metadata {
