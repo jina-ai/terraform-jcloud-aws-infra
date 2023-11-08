@@ -362,6 +362,7 @@ module "external-dns" {
   app_ref           = local.app_ref
   oidc_provider_arn = module.eks.oidc_provider_arn
   remote_role       = var.remote_external_dns_role
+  external_dns_role = var.external_dns_role
 }
 
 module "linkerd" {

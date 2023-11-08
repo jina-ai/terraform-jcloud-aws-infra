@@ -1,5 +1,5 @@
 module "external_dns_irsa" {
-  count   = var.remote_role == "" ? 1 : 0
+  count   = var.external_dns_role == "" ? 1 : 0
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 4.21.1"
 
@@ -59,7 +59,7 @@ resource "helm_release" "external_dns" {
 
   set {
     name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-    value = try(module.external_dns_irsa[0].iam_role_arn, var.remote_role)
+    value = try(module.external_dns_irsa[0].iam_role_arn, var.external_dns_role)
     type  = "string"
   }
 
@@ -98,6 +98,15 @@ resource "helm_release" "external_dns" {
   set {
     name  = "extraArgs[0]"
     value = "--aws-batch-change-size=10"
+  }
+
+  dynamic "set" {
+    for_each = var.remote_role != "" ? [1] : []
+    content {
+      name  = "extraArgs.aws-assume-role"
+      value = var.remote_role
+    }
+    
   }
 
   depends_on = [

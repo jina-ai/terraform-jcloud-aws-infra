@@ -29,3 +29,9 @@ variable "remote_role" {
   type        = string
   default     = ""
 }
+
+variable "external_dns_role" {
+  description = "External AWS external dns role"
+  type        = string
+  default     = ""
+}
