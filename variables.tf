@@ -314,6 +314,12 @@ variable "enable_grafana" {
   default     = false
 }
 
+variable "grafana_settings" {
+  description = "Grafana Database Credentials"
+  type        = map(any)
+  default     = {}
+}
+
 variable "grafana_additional_data_sources_yaml_body" {
   description = "(Optional) Grafana Additional Data Sources List in YAML Format. If not provided, use default data sources"
   type        = string

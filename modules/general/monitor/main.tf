@@ -16,7 +16,7 @@ module "monitor_store" {
 
 resource "kubernetes_namespace" "monitor" {
   metadata {
-     name = "monitor"
+    name = "monitor"
   }
 }
 
@@ -28,13 +28,7 @@ module "prometheus_stack" {
   cluster_name                                = var.cluster_name
   enable_grafana                              = var.enable_grafana
   enable_thanos                               = var.enable_thanos
-  grafana_additional_data_sources_yaml_body   = var.grafana_additional_data_sources_yaml_body
-  grafana_server_domain                       = var.grafana_server_domain
-  grafana_database                            = var.grafana_database
-  grafana_admin_password                      = var.grafana_admin_password
-  grafana_ingress_tls_secret_name             = var.grafana_ingress_tls_secret_name
-  grafana_ingress_class_name                  = var.grafana_ingress_class_name
-  grafana_ingress_yaml_body                   = var.grafana_ingress_yaml_body
+  grafana_settings                            = var.grafana_settings
   thanos_object_storage_config_name           = var.thanos_object_storage_config_name
   thanos_object_storage_config_key            = var.thanos_object_storage_config_key
   prometheus_stack_overwrite_values_yaml_body = var.prometheus_stack_overwrite_values_yaml_body

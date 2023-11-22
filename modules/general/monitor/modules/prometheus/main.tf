@@ -1,7 +1,7 @@
 locals {
   alertmanager_yaml_body = yamlencode({
     "alertmanager" : {
-      "config" : try(yamldecode(var.alertmanager_config_yaml_body), {})
+      "config" : try(yamldecode(var.grafana_settings.alertmanager_config), {})
     }
   })
 
@@ -9,37 +9,32 @@ locals {
     "grafana" : {
       "grafana.ini" : {
         "server" : {
-          "domain" : var.grafana_server_domain
+          "domain" : try(var.grafana_settings.server_domain, "localhost:3000")
         }
       },
-      "database" : merge(
-        { "type" : var.grafana_database.type },
-        var.grafana_database.host != "" ? { "host" : var.grafana_database.host } : {},
-        var.grafana_database.host != "" ? { "user" : var.grafana_database.user } : {},
-        var.grafana_database.host != "" ? { "password" : var.grafana_database.password } : {},
-      ),
-      "adminPassword" : var.grafana_admin_password,
+      "database" : try(grafana_settings.database, {}),
+      "adminPassword" : var.grafana_settings.admin_password,
     }
   })
 
   # [TODO] to enable path rewrite: https://stackoverflow.com/questions/66423946/how-can-i-use-kong-s-capturing-group-in-ingress-k8s-object-for-rewirting-logic
-  grafana_ingress_yaml_body = var.grafana_ingress_yaml_body != "" ? yamlencode(
+  grafana_ingress_yaml_body = var.grafana_settings.ingress_yaml_body != "" ? yamlencode(
     {
       "grafana" : {
-        "ingress" : try(yamldecode(var.grafana_ingress_yaml_body), {})
+        "ingress" : try(yamldecode(var.grafana_settings.ingress_yaml_body), {})
       }
     }
     ) : yamlencode({
       "grafana" : {
         "ingress" : {
           "enabled" : true,
-          "ingressClassName" : var.grafana_ingress_class_name,
+          "ingressClassName" : var.grafana_settings.ingress_class,
           "path" : "/",
-          "hosts" : [var.grafana_server_domain],
+          "hosts" : [try(var.grafana_settings.server_domain, "*")],
           "tls" : [
             {
-              "secretName" : var.grafana_ingress_tls_secret_name,
-              "hosts" : [var.grafana_server_domain]
+              "secretName" : var.grafana_settings.ingress_tls_secret_name,
+              "hosts" : [try(var.grafana_settings.server_domain, "*")]
             }
           ]
         }
@@ -48,47 +43,7 @@ locals {
 
   grafana_additional_data_sources_yaml_body = yamlencode({
     "grafana" : {
-      "additionalDataSources" : concat(
-        var.grafana_additional_data_sources_yaml_body != "" ? try(yamldecode(var.grafana_additional_data_sources_yaml_body), []) : [],
-        !(var.enable_logging || var.enable_loki) ? [] : [{
-          "name" : "loki",
-          "type" : "loki",
-          "uid" : "loki",
-          "access" : "proxy",
-          "url" : "http://kube-loki:3100",
-          "jsonData" : { "maxLines" : 1000 }
-        }],
-        !(var.enable_tracing || var.enable_tempo) ? [] : [{
-          "name" : "tempo",
-          "type" : "tempo",
-          "uid" : "tempo",
-          "access" : "proxy",
-          "url" : "http://kube-tempo-query-frontend:3100",
-          "jsonData" : {
-            "httpMethod" : "GET",
-            "tracesToMetrics" : {
-              "datasourceUid" : "prometheus",
-              "tags" : [{ "key" : "service.name", "value" : "service" }, { "key" : "job" }, { "key" : "k8s.pod", "value" : "pod" }, { "key" : "cluster" }],
-              "queries" : [
-                {
-                  "name" : "Sample query",
-                  "query" : "sum(rate(tempo_spanmetrics_latency_bucket{$__tags}[5m]))"
-                }
-              ],
-            },
-            "serviceMap" : { "datasourceUid" : "prometheus" },
-            "nodeGraph" : { "enabled" : true },
-            "lokiSearch" : { "datasourceUid" : "loki" },
-          }
-        }],
-        !(var.enable_metrics || var.enable_thanos) ? [] : [{
-          "name" : "thanos",
-          "type" : "prometheus",
-          "uid" : "thanos",
-          "access" : "proxy",
-          "url" : "http://kube-thanos-query:9090"
-        }]
-      )
+      "additionalDataSources" : var.grafana_settings.additional_data_sources != [] ? yamldecode(var.grafana_settings.additional_data_sources) : []
     }
   })
 
