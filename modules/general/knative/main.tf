@@ -124,11 +124,13 @@ resource "kubernetes_config_map_v1_data" "config-features" {
     namespace = "knative-serving"
   }
   data = {
-    "kubernetes.podspec-nodeselector"            = "enabled",
-    "kubernetes.podspec-persistent-volume-claim" = "enabled",
-    "kubernetes.podspec-persistent-volume-write" = "enabled",
-    "kubernetes.podspec-fieldref"                = "enabled",
-    "kubernetes.podspec-volumes-emptydir"        = "enabled",
+    "kubernetes.podspec-nodeselector"              = "enabled",
+    "kubernetes.podspec-persistent-volume-claim"   = "enabled",
+    "kubernetes.podspec-persistent-volume-write"   = "enabled",
+    "kubernetes.podspec-fieldref"                  = "enabled",
+    "kubernetes.podspec-volumes-emptydir"          = "enabled",
+    "kubernetes.podspec-topologyspreadconstraints" = "enabled",
+    "kubernetes.podspec-tolerations"               = "enabled",
   }
   force      = true
   depends_on = [kubectl_manifest.serving-core-resources]

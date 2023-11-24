@@ -363,6 +363,7 @@ module "external-dns" {
   oidc_provider_arn = module.eks.oidc_provider_arn
   remote_role       = var.remote_external_dns_role
   external_dns_role = var.external_dns_role
+  trigger_by_events = var.external_trigger_by_events
 }
 
 module "linkerd" {

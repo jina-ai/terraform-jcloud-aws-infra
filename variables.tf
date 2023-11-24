@@ -201,6 +201,12 @@ variable "enable_external_dns" {
   default     = false
 }
 
+variable "external_trigger_by_events" {
+  description = "Whether to enable trigger by events"
+  type        = bool
+  default     = true
+}
+
 variable "enable_karpenter" {
   description = "Whether to enable karpenter"
   type        = bool
