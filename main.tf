@@ -18,7 +18,12 @@ data "aws_ami" "eks_node" {
 
 data "aws_eks_cluster" "cluster" {
   name       = local.cluster_name
-  depends_on = [module.eks]
+  depends_on = [module.eks.cluster_id, module.eks.cluster_endpoint]
+}
+
+data "aws_eks_cluster_auth" "auth" {
+  name       = local.cluster_name
+  depends_on = [module.eks.cluster_id, module.eks.cluster_endpoint]
 }
 
 
@@ -405,14 +410,60 @@ module "knative" {
 }
 
 module "monitor" {
-  count          = var.enable_monitor_store ? 1 : 0
-  source         = "./modules/general/monitor"
+  count  = var.enable_monitor ? 1 : 0
+  source = "./modules/general/monitor"
+  # common variables
   cluster_name   = time_sleep.this.triggers["cluster_name"]
-  create_buckets = var.create_buckets
-  traces_bucket  = var.traces_bucket
-  metrics_bucket = var.metrics_bucket
-  log_bucket     = var.log_bucket
-  tags           = var.tags
+  enable_logging = var.enable_logging
+  enable_metrics = var.enable_metrics
+  enable_tracing = var.enable_tracing
+  # prometheus
+  enable_prometheus                           = var.enable_prometheus
+  enable_grafana                              = var.enable_grafana
+  grafana_server_domain                       = var.grafana_server_domain
+  grafana_database                            = var.grafana_database
+  grafana_admin_password                      = var.grafana_admin_password
+  grafana_ingress_tls_secret_name             = var.grafana_ingress_tls_secret_name
+  grafana_ingress_class_name                  = var.grafana_ingress_class_name
+  grafana_additional_data_sources_yaml_body   = var.grafana_additional_data_sources_yaml_body
+  alertmanager_config_yaml_body               = var.alertmanager_config_yaml_body
+  grafana_ingress_yaml_body                   = var.grafana_ingress_yaml_body
+  prometheus_otlp_collector_scrape_endpoint   = var.prometheus_otlp_collector_scrape_endpoint
+  prometheus_stack_overwrite_values_yaml_body = var.prometheus_stack_overwrite_values_yaml_body
+  # promtail
+  enable_promtail                     = var.enable_promtail
+  promtail_clients_urls               = var.promtail_clients_urls
+  promtail_overwrite_values_yaml_body = var.promtail_overwrite_values_yaml_body
+  # loki
+  enable_loki                     = var.enable_loki
+  loki_overwrite_values_yaml_body = var.loki_overwrite_values_yaml_body
+  # tempo
+  enable_tempo                     = var.enable_tempo
+  tempo_overwrite_values_yaml_body = var.tempo_overwrite_values_yaml_body
+  # otlp collector 
+  enable_otlp_collector                     = var.enable_otlp_collector
+  otlp_endpoint                             = var.otlp_endpoint
+  otlp_collector_overwrite_values_yaml_body = var.otlp_collector_overwrite_values_yaml_body
+  # thanos
+  enable_thanos                     = var.enable_thanos
+  thanos_object_storage_config_name = var.thanos_object_storage_config_name # also required by prometheus module
+  thanos_object_storage_config_key  = var.thanos_object_storage_config_key  # also required by prometheus module
+  thanos_overwrite_values_yaml_body = var.thanos_overwrite_values_yaml_body
+  # monitor store component arguments
+  enable_monitor_store = var.enable_monitor_store
+  create_buckets       = var.create_buckets
+  traces_bucket        = var.traces_bucket
+  metrics_bucket       = var.metrics_bucket
+  log_bucket           = var.log_bucket
+  tags                 = var.tags
+  # in case monitor_store is not enabled, we need the following to access custom aws buckets for logs, metrics and etc
+  log_bucket_region             = var.log_bucket_region
+  traces_bucket_region          = var.traces_bucket_region
+  metrics_bucket_region         = var.metrics_bucket_region
+  monitor_iam_access_key_id     = var.monitor_iam_access_key_id
+  monitor_iam_access_key_secret = var.monitor_iam_access_key_secret
+  # instantiate after eks is provisioned
+  depends_on = [module.eks]
 }
 
 module "kubecost" {

@@ -1,30 +1,26 @@
-output "iam_user_name" {
-  description = "The user's name"
-  value       = module.iam_user.iam_user_name
+output "prometheus_stack_yaml_body" {
+  description = "Values in YAML of Prometheus"
+  value       = try(module.prometheus_stack[0].yaml_body, "")
 }
 
-output "iam_user_arn" {
-  description = "The ARN assigned by AWS for this user"
-  value       = module.iam_user.iam_user_arn
+output "loki_yaml_body" {
+  description = "Values in YAML of Loki"
+  value       = try(module.loki[0].yaml_body, "")
 }
 
-output "iam_access_key_id" {
-  description = "The access key ID"
-  value       = module.iam_user.iam_access_key_id
+
+output "tempo_yaml_body" {
+  description = "Values in YAML of Tempo"
+  value       = try(module.tempo[0].yaml_body, "")
 }
 
-output "iam_access_key_secret" {
-  description = "The access key secret"
-  value       = module.iam_user.iam_access_key_secret
-  sensitive   = true
+output "promtail_yaml_body" {
+  description = "Values in YAML of Promtail"
+  value       = try(module.promtail[0].yaml_body, "")
 }
 
-output "iam_role_arn" {
-  description = "ARN of IAM role"
-  value       = module.iam_assumable_role_monitor.iam_role_arn
-}
 
-output "iam_role_name" {
-  description = "Name of IAM role"
-  value       = module.iam_assumable_role_monitor.iam_role_name
+output "otlp_collector_yaml_body" {
+  description = "Values in YAML of OTLP Collector"
+  value       = try(module.otlp_collector[0].yaml_body, "")
 }

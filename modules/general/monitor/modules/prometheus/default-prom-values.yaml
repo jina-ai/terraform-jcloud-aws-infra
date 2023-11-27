@@ -1,0 +1,56 @@
+alertmanager:
+  config:
+    global:
+      resolve_timeout: 5m
+    inhibit_rules:
+      - source_matchers:
+          - "severity = critical"
+        target_matchers:
+          - "severity =~ warning|info"
+        equal:
+          - "namespace"
+          - "alertname"
+      - source_matchers:
+          - "severity = warning"
+        target_matchers:
+          - "severity = info"
+        equal:
+          - "namespace"
+          - "alertname"
+      - source_matchers:
+          - "alertname = InfoInhibitor"
+        target_matchers:
+          - "severity = info"
+        equal:
+          - "namespace"
+    templates:
+      - "/etc/alertmanager/config/*.tmpl"
+  alertmanagerSpec:
+    replicas: 2
+    nodeSelector:
+      jina.ai/node-type: system
+
+prometheusOperator:
+  nodeSelector:
+    jina.ai/node-type: system
+
+prometheus:
+  thanosService:
+    enabled: true
+  prometheusSpec:
+    nodeSelector:
+      jina.ai/node-type: system
+    retention: 60m
+    retentionSize: "20GB"
+    replicas: 2
+    serviceMonitorSelector: {}
+    serviceMonitorSelectorNilUsesHelmValues: false
+
+kube-state-metrics:
+  nodeSelector:
+    jina.ai/node-type: system
+
+
+prometheus-node-exporter:
+  # this is to avoid promtail not scheduled onto node because of too many pods error
+  priorityClassName: system-node-critical
