@@ -207,6 +207,12 @@ variable "enable_external_dns" {
   default     = false
 }
 
+variable "external_trigger_by_events" {
+  description = "Whether to enable trigger by events"
+  type        = bool
+  default     = true
+}
+
 variable "enable_karpenter" {
   description = "Whether to enable karpenter"
   type        = bool
@@ -521,6 +527,10 @@ variable "enable_tracing" {
   default     = false
 }
 
+variable "enable_dcgm_exporter" {
+  description = "Whether to enable DCGM Exporter"
+  default     = false
+}
 
 # Other
 variable "init_node_type" {
