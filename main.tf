@@ -457,6 +457,7 @@ module "monitor" {
   metrics_bucket       = var.metrics_bucket
   log_bucket           = var.log_bucket
   tags                 = var.tags
+  enable_dcgm_exporter = var.enable_dcgm_exporter
   # in case monitor_store is not enabled, we need the following to access custom aws buckets for logs, metrics and etc
   log_bucket_region             = var.log_bucket_region
   traces_bucket_region          = var.traces_bucket_region

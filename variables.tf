@@ -527,6 +527,10 @@ variable "enable_tracing" {
   default     = false
 }
 
+variable "enable_dcgm_exporter" {
+  description = "Whether to enable DCGM Exporter"
+  default     = false
+}
 
 # Other
 variable "init_node_type" {
