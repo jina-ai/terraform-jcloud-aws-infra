@@ -47,7 +47,7 @@ resource "kubectl_manifest" "cert" {
     secretTemplate:
       annotations:
         reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
-        reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "jnamespace-[a-z0-9]*"
+        reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "jnamespace-[a-z0-9]*,monitor"
         reflector.v1.k8s.emberstack.com/reflection-allowed: "true"  # permit replication
         reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: ""  # comma separated list of namespaces or regular expressions
   YAML

@@ -1,0 +1,59 @@
+existingObjstoreSecret: "jcloud-monitor-store"
+query:
+  replicaLabel:
+  - "prometheus_replica"
+  - "replica"
+  dnsDiscovery:
+    sidecarsService: "kube-prometheus-stack-thanos-discovery"
+    sidecarsNamespace: "monitor"
+  replicaCount: 2
+  nodeSelector:
+    jina.ai/node-type: "system"
+queryFrontend:
+  nodeSelector:
+    jina.ai/node-type: "system"
+compactor:
+  enabled: true
+  retentionResolutionRaw: 2d
+  retentionResolution5m: 10d
+  retentionResolution1h: 30d
+  extraFlags:
+  - "--block-viewer.global.sync-block-interval=10m"
+  nodeSelector: 
+    jina.ai/node-type: "system"
+  persistence:
+    enabled: true
+    storageClass: "ebs-sc"
+    accessModes:
+    - ReadWriteOnce
+    size: 50Gi
+storegateway:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      memory: "1G"
+      cpu: "0.5"
+  nodeSelector: 
+    jina.ai/node-type: "system"
+  extraFlags:
+  - "--sync-block-duration=10m"
+  sharded:
+    enabled: false
+    hashPartitioning:
+      shards: ""
+    timePartitioning:
+      - min: ""
+        max: ""
+  persistence:
+    enabled: true
+    storageClass: "ebs-sc"
+    accessModes:
+    - ReadWriteOnce
+    size: 100Gi
+metrics:
+  enabled: true
+  labels:
+      release: kube-prometheus-stack
+  serviceMonitor:
+    enabled: true

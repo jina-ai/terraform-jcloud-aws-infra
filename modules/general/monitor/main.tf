@@ -1,204 +1,117 @@
-data "aws_partition" "current" {}
-data "aws_caller_identity" "current" {}
-
 locals {
-  metrics_bucket = length(var.metrics_bucket) > 0 ? var.metrics_bucket : "${var.cluster_name}-metrics"
-  log_bucket     = length(var.log_bucket) > 0 ? var.log_bucket : "${var.cluster_name}-logs"
-  traces_bucket  = length(var.traces_bucket) > 0 ? var.traces_bucket : "${var.cluster_name}-traces"
+  monitor_namespace = "monitor"
 }
 
-module "iam_user" {
-  source = "terraform-aws-modules/iam/aws//modules/iam-user"
-
-  name          = "${var.cluster_name}-monitor-user"
-  force_destroy = true
-
-  password_reset_required = false
-
-  tags = var.tags
+module "monitor_store" {
+  count          = var.enable_monitor_store ? 1 : 0
+  source         = "./modules/monitor-store"
+  cluster_name   = var.cluster_name
+  create_buckets = var.create_buckets
+  traces_bucket  = var.traces_bucket
+  metrics_bucket = var.metrics_bucket
+  log_bucket     = var.log_bucket
+  tags           = var.tags
 }
 
-module "iam_policy_s3" {
-  count  = var.create_buckets ? 1 : 0
-  source = "terraform-aws-modules/iam/aws//modules/iam-policy"
 
-  name        = "${var.cluster_name}-s3-policy"
-  path        = "/"
-  description = "Manage monitor bucket"
-
-  tags = var.tags
-
-  policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-      {
-          "Sid": "Statement",
-          "Effect": "Allow",
-          "Action": [
-              "s3:ListBucket",
-              "s3:GetObject",
-              "s3:DeleteObject",
-              "s3:PutObject"
-          ],
-          "Resource": [
-              "arn:aws:s3:::${local.metrics_bucket}/*",
-              "arn:aws:s3:::${local.metrics_bucket}",
-              "arn:aws:s3:::${local.log_bucket}/*",
-              "arn:aws:s3:::${local.log_bucket}",
-              "arn:aws:s3:::${local.traces_bucket}/*",
-              "arn:aws:s3:::${local.traces_bucket}"
-          ]
-      }
-    ]
-}
-EOF
+resource "kubernetes_namespace" "monitor" {
+  metadata {
+     name = "monitor"
+  }
 }
 
-resource "aws_s3_bucket" "metrics" {
-  count  = var.create_buckets ? 1 : 0
-  bucket = "${var.cluster_name}-metrics"
+module "prometheus_stack" {
+  source                                      = "./modules/prometheus"
+  count                                       = (var.enable_metrics || var.enable_prometheus) ? 1 : 0
+  namespace                                   = local.monitor_namespace
+  alertmanager_config_yaml_body               = var.alertmanager_config_yaml_body
+  cluster_name                                = var.cluster_name
+  enable_grafana                              = var.enable_grafana
+  enable_thanos                               = var.enable_thanos
+  grafana_additional_data_sources_yaml_body   = var.grafana_additional_data_sources_yaml_body
+  grafana_server_domain                       = var.grafana_server_domain
+  grafana_database                            = var.grafana_database
+  grafana_admin_password                      = var.grafana_admin_password
+  grafana_ingress_tls_secret_name             = var.grafana_ingress_tls_secret_name
+  grafana_ingress_class_name                  = var.grafana_ingress_class_name
+  grafana_ingress_yaml_body                   = var.grafana_ingress_yaml_body
+  thanos_object_storage_config_name           = var.thanos_object_storage_config_name
+  thanos_object_storage_config_key            = var.thanos_object_storage_config_key
+  prometheus_stack_overwrite_values_yaml_body = var.prometheus_stack_overwrite_values_yaml_body
+  enable_loki                                 = var.enable_loki
+  enable_tempo                                = var.enable_tempo
+  prometheus_otlp_collector_scrape_endpoint   = var.prometheus_otlp_collector_scrape_endpoint
+  enable_otlp_collector                       = var.enable_otlp_collector
+  enable_logging                              = var.enable_logging
+  enable_metrics                              = var.enable_metrics
+  enable_tracing                              = var.enable_tracing
 
-  tags = var.tags
+  // jcloud-monitor-store is needed
+  depends_on = [module.thanos, kubernetes_namespace.monitor]
 }
 
-resource "aws_s3_bucket" "logs" {
-  count  = var.create_buckets ? 1 : 0
-  bucket = "${var.cluster_name}-logs"
+module "promtail" {
+  source                              = "./modules/promtail"
+  count                               = var.enable_logging || var.enable_promtail ? 1 : 0
+  namespace                           = local.monitor_namespace
+  clients_urls                        = var.promtail_clients_urls
+  promtail_overwrite_values_yaml_body = var.promtail_overwrite_values_yaml_body
 
-  tags = var.tags
+  depends_on = [kubernetes_namespace.monitor]
 }
 
-resource "aws_s3_bucket" "traces" {
-  count  = var.create_buckets ? 1 : 0
-  bucket = "${var.cluster_name}-traces"
-
-  tags = var.tags
+module "loki" {
+  source                          = "./modules/loki"
+  count                           = var.enable_loki ? 1 : 0
+  namespace                       = local.monitor_namespace
+  loki_overwrite_values_yaml_body = var.loki_overwrite_values_yaml_body
+  log_bucket_name                 = var.enable_monitor_store ? module.monitor_store[0].log_bucket_name : var.log_bucket
+  log_bucket_region               = var.enable_monitor_store ? module.monitor_store[0].log_bucket_region : var.log_bucket_region
+  monitor_iam_access_key_id       = var.enable_monitor_store ? module.monitor_store[0].iam_access_key_id : var.monitor_iam_access_key_id
+  monitor_iam_access_key_secret   = var.enable_monitor_store ? module.monitor_store[0].iam_access_key_secret : var.monitor_iam_access_key_secret
+  depends_on                      = [module.monitor_store, kubernetes_namespace.monitor]
 }
 
-resource "aws_s3_bucket_public_access_block" "metrics" {
-  count  = var.create_buckets ? 1 : 0
-  bucket = aws_s3_bucket.metrics[0].id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
+module "tempo" {
+  source                           = "./modules/tempo"
+  count                            = (var.enable_tracing || var.enable_tempo) ? 1 : 0
+  namespace                        = local.monitor_namespace
+  tempo_overwrite_values_yaml_body = var.tempo_overwrite_values_yaml_body
+  traces_bucket_name               = var.enable_monitor_store ? module.monitor_store[0].traces_bucket_name : var.traces_bucket
+  traces_bucket_region             = var.enable_monitor_store ? module.monitor_store[0].traces_bucket_region : var.traces_bucket_region
+  monitor_iam_access_key_id        = var.enable_monitor_store ? module.monitor_store[0].iam_access_key_id : var.monitor_iam_access_key_id
+  monitor_iam_access_key_secret    = var.enable_monitor_store ? module.monitor_store[0].iam_access_key_secret : var.monitor_iam_access_key_secret
+  depends_on                       = [module.monitor_store, kubernetes_namespace.monitor]
 }
 
-resource "aws_s3_bucket_public_access_block" "log" {
-  count  = var.create_buckets ? 1 : 0
-  bucket = aws_s3_bucket.logs[0].id
+module "otlp_collector" {
+  source                                    = "./modules/otlp-collector"
+  count                                     = (var.enable_tracing || var.enable_otlp_collector) ? 1 : 0
+  namespace                                 = local.monitor_namespace
+  otlp_endpoint                             = var.otlp_endpoint
+  otlp_collector_overwrite_values_yaml_body = var.otlp_collector_overwrite_values_yaml_body
 
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
+  depends_on = [kubernetes_namespace.monitor, module.prometheus_stack]
 }
 
-resource "aws_s3_bucket_public_access_block" "traces" {
-  count  = var.create_buckets ? 1 : 0
-  bucket = aws_s3_bucket.traces[0].id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
+module "thanos" {
+  source                            = "./modules/thanos"
+  count                             = var.enable_thanos ? 1 : 0
+  namespace                         = local.monitor_namespace
+  thanos_object_storage_config_name = var.thanos_object_storage_config_name
+  thanos_object_storage_config_key  = var.thanos_object_storage_config_key
+  thanos_overwrite_values_yaml_body = var.thanos_overwrite_values_yaml_body
+  metrics_bucket_name               = var.enable_monitor_store ? module.monitor_store[0].metrics_bucket_name : var.metrics_bucket
+  metrics_bucket_region             = var.enable_monitor_store ? module.monitor_store[0].metrics_bucket_region : var.metrics_bucket_region
+  monitor_iam_access_key_id         = var.enable_monitor_store ? module.monitor_store[0].iam_access_key_id : var.monitor_iam_access_key_id
+  monitor_iam_access_key_secret     = var.enable_monitor_store ? module.monitor_store[0].iam_access_key_secret : var.monitor_iam_access_key_secret
+  depends_on                        = [module.monitor_store, kubernetes_namespace.monitor]
 }
 
-module "iam_policy_cloudwatch" {
-  source = "terraform-aws-modules/iam/aws//modules/iam-policy"
+module "dcgm_exporter" {
+  source    = "./modules/dcgm-exporter"
+  count     = (var.enable_metrics || var.enable_dcgm_exporter) ? 1 : 0
+  namespace = local.monitor_namespace
 
-  name        = "${var.cluster_name}-cloudwatch-policy"
-  path        = "/"
-  description = "Manage Cloudwatch metrics and logs"
-
-  tags = var.tags
-
-  policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-      {
-          "Sid": "AllowReadingMetricsFromCloudWatch",
-          "Effect": "Allow",
-          "Action": [
-              "cloudwatch:DescribeAlarmsForMetric",
-              "cloudwatch:DescribeAlarmHistory",
-              "cloudwatch:DescribeAlarms",
-              "cloudwatch:ListMetrics",
-              "cloudwatch:GetMetricData",
-              "cloudwatch:GetInsightRuleReport"
-          ],
-          "Resource": "*"
-      },
-      {
-          "Sid": "AllowReadingLogsFromCloudWatch",
-          "Effect": "Allow",
-          "Action": [
-              "logs:DescribeLogGroups",
-              "logs:GetLogGroupFields",
-              "logs:StartQuery",
-              "logs:StopQuery",
-              "logs:GetQueryResults",
-              "logs:GetLogEvents"
-          ],
-          "Resource": "*"
-      },
-      {
-          "Sid": "AllowReadingTagsInstancesRegionsFromEC2",
-          "Effect": "Allow",
-          "Action": [
-              "ec2:DescribeTags",
-              "ec2:DescribeInstances",
-              "ec2:DescribeRegions"
-          ],
-          "Resource": "*"
-      },
-      {
-          "Sid": "AllowReadingResourcesForTags",
-          "Effect": "Allow",
-          "Action": "tag:GetResources",
-          "Resource": "*"
-      }
-    ]
-}
-EOF
-}
-
-##########################################
-# IAM assumable role with custom policies
-##########################################
-module "iam_assumable_role_monitor" {
-  source = "terraform-aws-modules/iam/aws//modules/iam-assumable-role"
-
-  trusted_role_arns = [
-    module.iam_user.iam_user_arn,
-  ]
-
-  create_role = true
-
-  role_name         = "${var.cluster_name}-monitor-role"
-  role_requires_mfa = false
-
-  custom_role_policy_arns = [
-    module.iam_policy_cloudwatch.arn,
-    try(module.iam_policy_s3[0].arn, ""),
-  ]
-
-  tags = var.tags
-}
-
-resource "aws_iam_policy_attachment" "cloudwatch-attach" {
-  name       = "${var.cluster_name}-monitor-attachment"
-  users      = [module.iam_user.iam_user_name]
-  roles      = [module.iam_assumable_role_monitor.iam_role_name]
-  policy_arn = module.iam_policy_cloudwatch.arn
-}
-
-resource "aws_iam_policy_attachment" "s3-attach" {
-  name       = "${var.cluster_name}-monitor-attachment"
-  users      = [module.iam_user.iam_user_name]
-  roles      = [module.iam_assumable_role_monitor.iam_role_name]
-  policy_arn = try(module.iam_policy_s3[0].arn, "")
+  depends_on = [kubernetes_namespace.monitor, module.prometheus_stack]
 }
