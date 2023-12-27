@@ -215,21 +215,21 @@ module "eks" {
     [for role in var.eks_admin_roles :
       {
         rolearn  = startswith(role, "arn:aws:iam") == true ? role : "arn:aws:iam::${local.account_id}:role/${role}"
-        username = startswith(role, "arn:aws:iam") == true ? slice(split("/", role),1, length(split("/", role))) : role
+        username = startswith(role, "arn:aws:iam") == true ? join("/", slice(split("/", role),1, length(split("/", role)))) : role
         groups   = ["system:masters"]
       }
     ],
     [for role in var.eks_readonly_roles :
       {
         rolearn  = startswith(role, "arn:aws:iam") == true ? role : "arn:aws:iam::${local.account_id}:role/${role}"
-        username = startswith(role, "arn:aws:iam") == true ? slice(split("/", role),1, length(split("/", role))) : role
+        username = startswith(role, "arn:aws:iam") == true ? join("/", slice(split("/", role),1, length(split("/", role)))) : role
         groups   = ["wolf-read-only"]
       }
     ],
     [for role, group in var.eks_custom_roles :
       {
         rolearn  = startswith(role, "arn:aws:iam") == true ? role : "arn:aws:iam::${local.account_id}:role/${role}"
-        username = startswith(role, "arn:aws:iam") == true ? slice(split("/", role),1, length(split("/", role))) : role
+        username = startswith(role, "arn:aws:iam") == true ? join("/", slice(split("/", role),1, length(split("/", role)))) : role
         groups   = ["${group}"]
       }
     ],
@@ -239,21 +239,21 @@ module "eks" {
     [for user in var.eks_admin_users :
       {
         userarn  = startswith(user, "arn:aws:iam") == true ? user : "arn:aws:iam::${local.account_id}:user/${user}"
-        username = startswith(user, "arn:aws:iam") == true ? slice(split("/", user),1, length(split("/", user))) : user
+        username = startswith(user, "arn:aws:iam") == true ? join("/", slice(split("/", user),1, length(split("/", user)))) : user
         groups   = ["system:masters"]
       }
     ],
     [for user in var.eks_readonly_users :
       {
         userarn  = startswith(user, "arn:aws:iam") == true ? user : "arn:aws:iam::${local.account_id}:user/${user}"
-        username = startswith(user, "arn:aws:iam") == true ? slice(split("/", user),1, length(split("/", user))) : user
+        username = startswith(user, "arn:aws:iam") == true ? join("/", slice(split("/", user),1, length(split("/", user)))) : user
         groups   = ["wolf-read-only"]
       }
     ],
     [for user, group in var.eks_custom_users :
       {
         userarn  = startswith(user, "arn:aws:iam") == true ? user : "arn:aws:iam::${local.account_id}:user/${user}"
-        username = startswith(user, "arn:aws:iam") == true ? slice(split("/", user),1, length(split("/", user))) : user
+        username = startswith(user, "arn:aws:iam") == true ? join("/", slice(split("/", user),1, length(split("/", user)))) : user
         groups   = ["${group}"]
       }
     ],
