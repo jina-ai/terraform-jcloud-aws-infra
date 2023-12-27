@@ -109,6 +109,7 @@ resource "kubectl_manifest" "karpenter_provisioner" {
       launchTemplate: "karpenter-default-${local.cluster_name}"
       subnetSelector:
         karpenter.sh/discovery: ${local.cluster_name}
+        jina.ai/tier: private
       tags:
         karpenter.sh/discovery: ${local.cluster_name}
   YAML
@@ -149,6 +150,7 @@ resource "kubectl_manifest" "karpenter_provisioner_system" {
       launchTemplate: "karpenter-system-${local.cluster_name}"
       subnetSelector:
         karpenter.sh/discovery: ${local.cluster_name}
+        jina.ai/tier: private
       tags:
         karpenter.sh/discovery: ${local.cluster_name}
   YAML
@@ -202,6 +204,7 @@ resource "kubectl_manifest" "karpenter_provisioner_privileged" {
       launchTemplate: "karpenter-default-${local.cluster_name}"
       subnetSelector:
         karpenter.sh/discovery: ${local.cluster_name}
+        jina.ai/tier: private
       tags:
         karpenter.sh/discovery: ${local.cluster_name}
   YAML
@@ -259,6 +262,7 @@ resource "kubectl_manifest" "karpenter_provisioner_gpu_shared" {
       launchTemplate: "karpenter-gpu-shared-${local.cluster_name}"
       subnetSelector:
         karpenter.sh/discovery: ${local.cluster_name}
+        jina.ai/tier: private
       tags:
         karpenter.sh/discovery: ${local.cluster_name}
     ttlSecondsAfterEmpty: 300
@@ -302,6 +306,7 @@ resource "kubectl_manifest" "karpenter_provisioner_gpu" {
       launchTemplate: "karpenter-gpu-${local.cluster_name}"
       subnetSelector:
         karpenter.sh/discovery: ${local.cluster_name}
+        jina.ai/tier: private
       tags:
         karpenter.sh/discovery: ${local.cluster_name}
     ttlSecondsAfterEmpty: 300
