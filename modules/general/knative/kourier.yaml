@@ -446,6 +446,7 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9000"
         prometheus.io/path: "/stats/prometheus"
+        linkerd.io/inject: disabled
     spec:
       containers:
         - args:
