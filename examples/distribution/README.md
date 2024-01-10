@@ -1,5 +1,17 @@
 # Embedding Models on GPU with JCloud
 
+### Pre-requisites
+
+##### Install required tools
+
+1. [terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli)
+2. [helm](https://helm.sh/docs/intro/install/)
+3. [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
+4. [awscli](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html)
+
+---
+
+### Setup
 
 ##### Setup EKS cluster with Terraform
 
@@ -60,7 +72,7 @@ kubectl apply -f .
 ##### Create `base-en` model in `jnamespace-deepankar` namespace
 
 <details>
-<summary><b>Expand to see the "base-model-gpu.yml" file</b></summary>
+<summary>Expand to see the <i>base-model-gpu.yml</i> file</summary>
 
 ```yaml
 apiVersion: v1
@@ -126,11 +138,11 @@ spec:
 kubectl apply -f base-model-gpu.yml
 ```
 
+Run required tests on the model.. 
+
 ---
 
-#### Tear Down & Clean-Up
-
-Because Karpenter manages the state of node resources outside of Terraform, Karpenter created resources will need to be de-provisioned first before removing the remaining resources with Terraform.
+### Clean-Up
 
 
 1. Remove all Deployments created above
