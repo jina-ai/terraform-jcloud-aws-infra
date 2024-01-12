@@ -142,7 +142,7 @@ kubectl delete deployments.jcloud.jina.ai --all -A
 ```
 
 
-2. (Optional) Remove `wolf` namespace (to delete `resource-manager` and `image-puller`)
+2. Remove `wolf` namespace (to delete `resource-manager` and `image-puller`) (if any)
 
 ```bash
 kubectl delete ns wolf
@@ -154,9 +154,16 @@ kubectl delete ns wolf
 helm uninstall jcloud-operator -n jcloud
 ```
 
+4. Remove the IAM role created by Terraform (if any)
+
+```bash
+cd iam/
+terraform destroy --auto-approve
+```
+
 
 4. Remove the Resources created by Terraform
 
 ```bash
-terraform destroy 
+terraform destroy --auto-approve
 ```
