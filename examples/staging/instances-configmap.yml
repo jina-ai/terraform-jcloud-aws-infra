@@ -1,0 +1,79 @@
+apiVersion: v1
+name: jcloud-instances
+kind: ConfigMap
+data:
+  instances.yml: |
+    instances:
+      CPU:
+        - name: C1
+          resource:
+            cpu: 0.1
+            memory: 0.2G
+          cph: 1
+        - name: C2
+          resource:
+            cpu: 0.5
+            memory: 1G
+          cph: 5
+        - name: C3
+          resource:
+            cpu: 1
+            memory: 2G
+          cph: 10
+        - name: C4
+          resource:
+            cpu: 2
+            memory: 4G
+          cph: 20
+        - name: C5
+          resource:
+            cpu: 4
+            memory: 8G
+          cph: 40
+        - name: C6
+          resource:
+            cpu: 8
+            memory: 16G
+          cph: 80
+        - name: C7
+          resource:
+            cpu: 16
+            memory: 32G
+          cph: 160
+        - name: C8
+          resource:
+            cpu: 32
+            memory: 64G
+          cph: 320
+      SHAREGPU:
+        - name: G1
+          resource:
+            gpu: shared
+          cph: 100
+      GPU:
+        - name: G2
+          resource:
+            gpu: "1"
+            memory: 14G
+          cph: 125
+        - name: G3
+          resource:
+            gpu: "2"
+            memory: 24G
+          cph: 250
+        - name: G4
+          resource:
+            gpu: "4"
+            memory: 56G
+          cph: 500
+    Storage:
+      # free to use Ephemeral
+      EPHEMERAL:
+        cph: 0
+      # monthly credits for EBS is 30, CPH is calculated using 30/720
+      EBS:
+        cph: 0.042
+      # monthly credits for EFS is 75, CPH is calculated using 75/720
+      EFS:
+        cph: 0.104
+

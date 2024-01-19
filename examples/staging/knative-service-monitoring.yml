@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: autoscaler
+spec:
+  endpoints:
+    - honorLabels: true
+      interval: 30s
+      path: /metrics
+      port: http-metrics
+  namespaceSelector:
+    matchNames:
+      - knative-serving
+  selector:
+    matchLabels:
+      app: autoscaler
+

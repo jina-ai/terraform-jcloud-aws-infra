@@ -1,0 +1,375 @@
+commonLabels: {}
+clusterid: test123
+
+apimanager:
+  enable: false
+  # TODO, have HPA.
+  autoscaling:
+    enable: false
+    # minReplicas: 1
+    # maxReplicas: 10
+    # metrics:
+    # - type: Resource
+    #   resource:
+    #     name: cpu
+    #     targetAverageUtilization: 60
+    # - type: Resource
+    #   resource:
+    #     name: memory
+    #     targetAverageUtilization: 60
+
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: 3000
+    initialDelaySeconds: 15
+    periodSeconds: 20
+
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 3000
+    initialDelaySeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  image:
+    repository: "jinaai/jcloud-api-manager"
+    tag: "v0.0.4"
+    sha: ""
+    pullPolicy: IfNotPresent
+
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## Can be templated.
+    ##
+    # pullSecrets:
+    #   - myRegistrKeySecretName
+
+  # securityContext:
+  #   runAsUser: 472
+  #   runAsGroup: 472
+  #   fsGroup: 472
+
+  # Apply extra labels to common labels.
+  extraLabels: {}
+
+  ## Deployment annotations
+  # annotations: {}
+
+  ## Pod Annotations
+  # podAnnotations: {}
+
+  ## Pod Labels
+  # podLabels: {}
+
+  resources: {}
+  #  limits:
+  #    cpu: 100m
+  #    memory: 128Mi
+  #  requests:
+  #    cpu: 100m
+  #    memory: 128Mi
+
+  ## Node labels for pod assignment
+  ## ref: https://kubernetes.io/docs/user-guide/node-selection/
+  #
+  nodeSelector: {}
+
+  ## Tolerations for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  ##
+  tolerations: []
+
+  ## Affinity for pod assignment (evaluated as template)
+  ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  ##
+  affinity: {}
+
+  ## Topology Spread Constraints
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
+  ##
+  topologySpreadConstraints: []
+
+  ## Additional init containers (evaluated as template)
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
+  ##
+  extraInitContainers: []
+
+  # TODO persistent volume
+  ## Enable persistence using Persistent Volume Claims
+  ## ref: http://kubernetes.io/docs/user-guide/persistent-volumes/
+  ##
+  # persistence:
+  #   type: pvc
+  #   enabled: false
+  #   # storageClassName: default
+  #   accessModes:
+  #     - ReadWriteOnce
+  #   size: 10Gi
+  #   # annotations: {}
+  #   finalizers:
+  #     - kubernetes.io/pvc-protection
+  #   # selectorLabels: {}
+  #   ## Sub-directory of the PV to mount. Can be templated.
+  #   # subPath: ""
+  #   ## Name of an existing PVC. Can be templated.
+  #   # existingClaim:
+  #   ## Extra labels to apply to a PVC.
+  #   extraPvcLabels: {}
+  config:
+    mongo:
+      url: ""
+
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 3000
+    targetPort:
+      3000
+      # targetPort: 4181 To be used with a proxy extraContainer
+    ## Service annotations. Can be templated.
+    annotations: {}
+    labels: {}
+    portName: api
+    # Adds the appProtocol field to the service. This allows to work with istio protocol selection. Ex: "http" or "tcp"
+    appProtocol: ""
+
+  ingress:
+    enabled: false
+    # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
+    # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
+    # ingressClassName: nginx
+    # Values can be templated
+    # annotations:
+    #   kubernetes.io/ingress.class: kong
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+    labels: {}
+    path: /
+
+    # pathType is only for k8s >= 1.1=
+    pathType: Prefix
+
+    hosts: []
+    ## Extra paths to prepend to every host configuration. This is useful when working with annotation based services.
+    extraPaths: []
+    # - path: /*
+    #   backend:
+    #     serviceName: ssl-redirect
+    #     servicePort: use-annotation
+    ## Or for k8s > 1.19
+    # - path: /*
+    #   pathType: Prefix
+    #   backend:
+    #     service:
+    #       name: ssl-redirect
+    #       port:
+    #         name: use-annotation
+
+    # tls:
+    #   - secretName: wolf-tls
+    #     hosts:
+    #       - "*.wolf.jina.ai"
+    #  - secretName: chart-example-tls
+    #    hosts:
+    #      - chart-example.local
+
+operator:
+  customResources:
+    flow: true
+    deployment: false
+  rbac:
+    create: true
+    serviceAccount:
+      create: true
+      name:
+      ## Service account annotations. Can be templated.
+      #  annotations:
+      #    eks.amazonaws.com/role-arn: arn:aws:iam::123456789000:role/iam-role-name-here
+      annotations:
+      labels:
+
+  replicas: 1
+
+  # TODO, have HPA.
+  autoscaling:
+    enable: false
+    # minReplicas: 1
+    # maxReplicas: 10
+    # metrics:
+    # - type: Resource
+    #   resource:
+    #     name: cpu
+    #     targetAverageUtilization: 60
+    # - type: Resource
+    #   resource:
+    #     name: memory
+    #     targetAverageUtilization: 60
+
+  deploymentStrategy:
+    type: RollingUpdate
+
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: 8081
+    initialDelaySeconds: 15
+    periodSeconds: 20
+
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 8081
+    initialDelaySeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  image:
+    repository: "jinaai/jcloud-operator"
+    tag: "v0.0.4"
+    sha: ""
+    pullPolicy: IfNotPresent
+
+    ## Optionally specify an array of imagePullSecrets.
+    ## Secrets must be manually created in the namespace.
+    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ## Can be templated.
+    ##
+    # pullSecrets:
+    #   - myRegistrKeySecretName
+
+  # securityContext:
+  #   runAsUser: 472
+  #   runAsGroup: 472
+  #   fsGroup: 472
+
+  # Apply extra labels to common labels.
+  extraLabels: {}
+
+  ## Deployment annotations
+  # annotations: {}
+
+  ## Pod Annotations
+  # podAnnotations: {}
+
+  ## Pod Labels
+  podLabels: {}
+
+  resources: {}
+  #  limits:
+  #    cpu: 100m
+  #    memory: 128Mi
+  #  requests:
+  #    cpu: 100m
+  #    memory: 128Mi
+
+  ## Node labels for pod assignment
+  ## ref: https://kubernetes.io/docs/user-guide/node-selection/
+  #
+  nodeSelector: {}
+
+  ## Tolerations for pod assignment
+  ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+  ##
+  tolerations: []
+
+  ## Affinity for pod assignment (evaluated as template)
+  ## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  ##
+  affinity: {}
+
+  ## Topology Spread Constraints
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/
+  ##
+  topologySpreadConstraints: []
+
+  ## Additional init containers (evaluated as template)
+  ## ref: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
+  ##
+  extraInitContainers: []
+
+  # TODO persistent volume
+  ## Enable persistence using Persistent Volume Claims
+  ## ref: http://kubernetes.io/docs/user-guide/persistent-volumes/
+  ##
+  # persistence:
+  #   type: pvc
+  #   enabled: false
+  #   # storageClassName: default
+  #   accessModes:
+  #     - ReadWriteOnce
+  #   size: 10Gi
+  #   # annotations: {}
+  #   finalizers:
+  #     - kubernetes.io/pvc-protection
+  #   # selectorLabels: {}
+  #   ## Sub-directory of the PV to mount. Can be templated.
+  #   # subPath: ""
+  #   ## Name of an existing PVC. Can be templated.
+  #   # existingClaim:
+  #   ## Extra labels to apply to a PVC.
+  #   extraPvcLabels: {}
+
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 8443
+    targetPort:
+      https
+      # targetPort: 4181 To be used with a proxy extraContainer
+    ## Service annotations. Can be templated.
+    annotations: {}
+    labels: {}
+    portName: https
+    # Adds the appProtocol field to the service. This allows to work with istio protocol selection. Ex: "http" or "tcp"
+    appProtocol: ""
+
+  serviceMonitor:
+    ## If true, a ServiceMonitor CRD is created for a jcloud operator
+    ##
+    enabled: false
+    path: /metrics
+    #  namespace: monitoring  (defaults to use the namespace this chart is deployed to)
+    labels: {}
+    interval: 1m
+    scheme: http
+    tlsConfig: {}
+    scrapeTimeout: 30s
+    relabelings: []
+
+  debug:
+    logLevel: 0
+
+  config:
+    create: true
+    operator:
+      global:
+        docarray: 0.39.1
+        # jina: 3.23.0
+
+  trustCA: {}
+
+  secretSync:
+    enabled: false
+    config: {}
+    image:
+      repository: "jinaai/ecr-cred-sync"
+      tag: "d570aac-dirty__linux_amd64"
+      sha: ""
+      pullPolicy: IfNotPresent
+
+  rbacProxy:
+    enabled: true
+    image: gcr.io/kubebuilder/kube-rbac-proxy:v0.11.0
+    securityContext:
+      allowPrivilegeEscalation: false
+    resources:
+      limits:
+        cpu: 500m
+        memory: 128Mi
+      requests:
+        cpu: 5m
+        memory: 64Mi
+

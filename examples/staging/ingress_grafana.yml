@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - dashboard-stage.dev.wolf.jina.ai
+      secretName: dev-wolf-tls
+  rules:
+    - host: dashboard-stage.dev.wolf.jina.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-stack-grafana
+                port:
+                  number: 80
