@@ -17,6 +17,8 @@
 
 Make sure to change `cluster_name` & `vpc_name` in `main.tf` to a unique name. 
 
+`cluster_name` must follow one of these patterns: (jcloud-stage-eks-abcde) 
+
 ```bash
 $ terraform init
 $ terraform plan
@@ -40,18 +42,259 @@ aws eks --region us-east-1 update-kubeconfig --name <cluster_name>
 
 ##### Install `jcloud-operator`
 
-Enable only `deployment` operator. Disable `flow` operator & apimanager. 
+Enable a complete deployment of the Operators and the API manager:
+
+The Operator is lacking the instances ConfigMap, for this u need to create it 
+
+```bash
+kubectl create namespace jcloud
+kubectl create configmap jcloud-instances -n jcloud --from-file=instances.yml 
+```
+
+Add the repo:
 
 ```bash
 helm repo add jina https://jina.ai/helm-charts/
 helm search repo jina
 helm repo update
 helm install jcloud-operator jina/jcloud-operator -n jcloud \
-    --set apimanager.enable=false \
+    --set apimanager.enable=true \
     --set operator.customResources.deployment=true \
-    --set operator.customResources.flow=false \
+    --set operator.customResources.flow=true \
     --set operator.image.tag=v0.0.8 \
     --create-namespace
+```
+
+Somehow, the Release YAML needs to be different, I would recommend using this Helm provided values:
+
+```text
+apimanager:
+  affinity: {}
+  autoscaling:
+    enable: false
+  config:
+    mongo:
+      url: ""
+  enable: true
+  existingConfigmap: jcloud-instances
+  extraEnv:
+    JCLOUD_INSTANCE_CONFIG: /etc/jcloud/api/instances.yml
+  extraInitContainers: []
+  extraLabels: {}
+  image:
+    pullPolicy: Always
+    pullSecrets:
+    - jcloud-ecr-secret
+    repository: 253352124568.dkr.ecr.us-east-2.amazonaws.com/jcloud-api-manager
+    sha: 64498f2f10955abaff80898e16976f67063228891b3f865600035b5f1e6f99c4
+    tag: main
+  ingress:
+    annotations:
+      kubernetes.io/ingress.class: kong
+    enabled: true
+    extraPaths: []
+    hosts:
+    - "api-stage.dev.wolf.jina.ai" (OR ANY EXPOSED ADDRESS FOR JCLOUD API)
+    labels: {}
+    path: /
+    pathType: Prefix
+    tls:
+    - hosts:
+      - '*.dev.wolf.jina.ai'
+      secretName: dev-wolf-tls
+  livenessProbe:
+    failureThreshold: 3
+    httpGet:
+      path: /healthz
+      port: 3000
+    initialDelaySeconds: 15
+    timeoutSeconds: 5
+  nodeSelector:
+    jina.ai/node-type: system
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: 3000
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  replicas: 1
+  resources:
+    requests:
+      cpu: 1
+      memory: 2Gi
+  service:
+    annotations: {}
+    appProtocol: ""
+    enabled: true
+    labels: {}
+    port: 3000
+    portName: api
+    targetPort: 3000
+    type: ClusterIP
+  tolerations: []
+  topologySpreadConstraints: []
+clusterid: (CLUSTER NAME)
+commonLabels: {}
+operator:
+  affinity: {}
+  autoscaling:
+    enable: false
+  config:
+    create: true
+    mongo:
+      url: ""
+    operator:
+      global:
+        docarray: 0.39.1
+      monitor:
+        metrics: {}
+        serviceMonitor: true
+        traces:
+          host: http://opentelemetry-collector.monitor.svc.cluster.local
+          port: 4317
+      network:
+        domains:
+        - cert:
+            secret:
+              name: wolf-tls
+              namespace: cert-manager
+          name: wolf.jina.ai
+        - cert:
+            secret:
+              name: dev-wolf-tls
+              namespace: cert-manager
+          name: dev.wolf.jina.ai
+        - cert:
+            secret:
+              name: dev-tls
+              namespace: cert-manager
+          name: dev.jina.ai
+        healthcheck: true
+      nodegroups:
+        ALL:
+          nodeSelector:
+            jina.ai/node-type: standard
+            karpenter.sh/provisioner-name: default
+          resources:
+            limits:
+              cpu: 16
+              memory: 16G
+            requests:
+              cpu: 0.01
+              memory: 0.1G
+        GPU:
+          nodeSelector:
+            jina.ai/node-type: gpu
+            karpenter.sh/provisioner-name: gpu
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+          tolerations:
+          - effect: NoSchedule
+            key: nvidia.com/gpu
+            operator: Exists
+        SHAREGPU:
+          nodeSelector:
+            jina.ai/node-type: gpu-shared
+            karpenter.sh/provisioner-name: gpu-shared
+          resources:
+            limits:
+              memory: 12G
+              nvidia.com/gpu: 1
+            requests:
+              nvidia.com/gpu: 1
+          tolerations:
+          - effect: NoSchedule
+            key: nvidia.com/gpu-shared
+            operator: Exists
+      storage:
+        ebs:
+          name: ebs-sc
+        efs:
+          handler: fs-0c2bffb6a378f084b
+          name: efs-storageclass
+  customResources:
+    deployment: true
+    flow: true
+  debug:
+    logLevel: 0
+  deploymentStrategy:
+    type: RollingUpdate
+  extraInitContainers: []
+  extraLabels: {}
+  image:
+    pullPolicy: Always
+    pullSecrets:
+    - jcloud-ecr-secret
+    repository: 253352124568.dkr.ecr.us-east-2.amazonaws.com/jcloud-operator
+    sha: fba58c3ceaeecca342fabc787fb63ed4e5d3483b2cbecd09c81b8c58efa1d540
+    tag: latest
+  livenessProbe:
+    failureThreshold: 3
+    httpGet:
+      path: /healthz
+      port: 8081
+    initialDelaySeconds: 15
+    timeoutSeconds: 5
+  nodeSelector:
+    jina.ai/node-type: system
+  podLabels: {}
+  rbac:
+    create: true
+    serviceAccount:
+      create: true
+  rbacProxy:
+    enabled: true
+    image: gcr.io/kubebuilder/kube-rbac-proxy:v0.11.0
+    resources:
+      limits:
+        cpu: 500m
+        memory: 128Mi
+      requests:
+        cpu: 5m
+        memory: 64Mi
+    securityContext:
+      allowPrivilegeEscalation: false
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: 8081
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  replicas: 1
+  resources:
+    requests:
+      cpu: 1
+      memory: 2Gi
+  secretSync:
+    config: {}
+    enabled: false
+    image:
+      pullPolicy: IfNotPresent
+      repository: jinaai/ecr-cred-sync
+      sha: ""
+      tag: d570aac-dirty__linux_amd64
+  service:
+    annotations: {}
+    appProtocol: ""
+    enabled: true
+    labels: {}
+    port: 8443
+    portName: https
+    targetPort: https
+    type: ClusterIP
+  serviceMonitor:
+    enabled: false
+    interval: 1m
+    labels: {}
+    path: /metrics
+    relabelings: []
+    scheme: http
+    scrapeTimeout: 30s
+    tlsConfig: {}
+  tolerations: []
+  topologySpreadConstraints: []
+  trustCA: {}
 ```
 
 ##### (Optional) Install `resource-manager` 
@@ -129,6 +372,15 @@ kubectl apply -f base-model-gpu.yml
 ```
 
 Run required tests on the model.. 
+
+### Deploy management and Universal API:
+
+Follow the steps on each corresponding repo
+
+
+### Expose metrics for Karpenter, KNative, etc...
+
+Create all the `service-monitor` objects from the folder, and potentially expose Grafana ingress.
 
 ---
 
