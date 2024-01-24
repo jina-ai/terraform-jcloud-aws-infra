@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: activator-service
+spec:
+  endpoints:
+    - honorLabels: true
+      path: /metrics
+      port: http-metrics
+  namespaceSelector:
+    matchNames:
+      - knative-serving
+  selector:
+    matchLabels:
+      app: activator-service
+

@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: karpenter
+spec:
+  endpoints:
+    - honorLabels: true
+      path: /metrics
+      port: http-metrics
+  namespaceSelector:
+    matchNames:
+      - karpenter
+  selector:
+    matchLabels:
+      app: karpenter
+
